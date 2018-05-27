@@ -1,0 +1,11 @@
+atomicwrites==1.1.5
+attrs==18.1.0
+blessed==1.14.2
+more-itertools==4.2.0
+pluggy==0.6.0
+py==1.5.3
+pytest==3.6.0
+six==1.11.0
+sphinx-rtd-theme==0.3.1
+tabulate==0.8.2
+wcwidth==0.1.7
