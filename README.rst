@@ -1,4 +1,4 @@
-blessed-blocks: Blocks of text in a grid using blessed
+blessedblocks: Blocks of text in a grid using blessed
 ======================================================
 
 123

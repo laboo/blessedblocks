@@ -3,8 +3,8 @@ from setuptools import find_packages, setup
 setup(
     name='blessedblocks',
     packages=find_packages(),
-    version='0.0.1',
-    description='Update a terminal window in blocks using blessed module.',
+    version='0.0.2',
+    description='Update a terminal window in blocks using the blessed module.',
     author='Mark Libucha',
     author_email='mlibucha@gmail.com',
     url='http://nowhere.click',
@@ -34,6 +34,6 @@ setup(
         "more-itertools>=4.2.0, <5.0.0",
         "pluggy>=0.6.0, < 1.0.0",
         "py>=1.5.3, <2.0.0",
-        "pytest>=3.6.0, <4.0.0",
+        "pytest>=3.6.0, <4.0.0"
     ]
 )
