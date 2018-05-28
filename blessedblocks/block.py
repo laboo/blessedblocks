@@ -1,4 +1,4 @@
-from line import Line
+from blessedblocks.line import Line
 class Block(object):
     MIDDLE_DOT = u'\u00b7'
     def __init__(self, name,

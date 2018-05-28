@@ -1,5 +1,5 @@
-from block import Block
-from grid import Grid
+from blessedblocks.block import Block
+from blessedblocks.grid import Grid
 from threading import Event, Thread, Lock
 import signal
 from tabulate import tabulate
