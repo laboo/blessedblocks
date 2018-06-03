@@ -1,6 +1,6 @@
 from __future__ import print_function
 from blessed import Terminal
-from blessedblocks.block import Block
+from block import Block
 from math import floor, ceil
 from threading import Event, Thread, Lock
 import signal

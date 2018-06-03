@@ -1,3 +1,7 @@
+#!/usr/bin/python3
+import sys
+sys.path.append("/home/mlibucha/Envs/bb/blessedblocks/blessedblocks")
+# First two lines not needed if blessedblocks modules is installed
 from blessedblocks.block import Block
 from blessedblocks.grid import Grid
 from threading import Event, Thread, Lock
