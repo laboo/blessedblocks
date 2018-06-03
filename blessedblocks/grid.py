@@ -119,15 +119,7 @@ class Grid(object):
                 else:
                     block = self._slots[element]
                     if block.dirty:
-                        lines = block.display(h, w)
-                        if lines:
-                            for j, line in enumerate(lines):
-                                with term.location(x=x, y=y+j):
-                                    # Can debug here by printing to a file
-                                    try:
-                                        print(line.rstrip().format(t=term), end='')
-                                    except ValueError:
-                                        raise ValueError(line.rstrip())
+                        block.display(h, w, x, y, term=term)
 
         dfs(term, self._arrangement, width, height, x, y)
 

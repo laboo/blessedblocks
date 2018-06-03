@@ -79,7 +79,7 @@ class Block(object):
 
         return fmt
     
-    def display(self, height, width, term=None):
+    def display(self, height, width, x, y, term=None):
         self.dirty = False
         out = []
         if self.text is not None and len(self.text) != 0:
@@ -166,7 +166,15 @@ class Block(object):
             out[0] = '{t.normal}' + out[0]
             out[-1] += '{t.normal}'
 
-        return out
+        for j, line in enumerate(out):
+            with term.location(x=x, y=y+j):
+                # Can debug here by printing to a file
+                try:
+                    print(line.rstrip().format(t=term), end='')
+                except ValueError:
+                    raise ValueError(line.rstrip())
+
+        #return out
 
 def main():
     import sys
