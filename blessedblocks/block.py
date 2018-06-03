@@ -1,4 +1,4 @@
-from blessedblocks.line import Line
+from line import Line
 class Block(object):
     MIDDLE_DOT = u'\u00b7'
     def __init__(self, name,
@@ -166,41 +166,40 @@ class Block(object):
             out[0] = '{t.normal}' + out[0]
             out[-1] += '{t.normal}'
 
-        for j, line in enumerate(out):
-            with term.location(x=x, y=y+j):
-                # Can debug here by printing to a file
-                try:
-                    print(line.rstrip().format(t=term), end='')
-                except ValueError:
-                    raise ValueError(line.rstrip())
-
-        #return out
+        if term:
+            for j, line in enumerate(out):
+                with term.location(x=x, y=y+j):
+                    # Can debug here by printing to a file
+                    try:
+                        print(line.rstrip().format(t=term), end='')
+                    except ValueError:
+                        raise ValueError(line.rstrip())
+        else:
+            return out  # for testing purposes mostly
 
 def main():
     import sys
     from blessed import Terminal
-
+    
     height = int(sys.argv[1]) if len(sys.argv) > 2 else 10    
     width = int(sys.argv[2]) if len(sys.argv) > 2 else 10
-
     term = Terminal()
-
+    
     block = Block("me", left_border='*', right_border="x",  top_border='a', bottom_border='z', title="This is it.", hjust='>')
     block.update('hi\nthere\nyou\n01}23{}{4567890\n\n6th\n7th\n8\n9\n10')
-    lines = block.display(height,width)
+    lines = block.display(height,width,0,0)
     for line in lines:
         print(line.format(t=term))
 
     block = Block("you", left_border='*', right_border="x",  top_border='a', bottom_border='z', title="This is it.", hjust='>')
     block.update('hi\nthe{t.yellow}re\nyo}{u\n{t.blue}0123{t.red}4567890\n\n6th\n7th{t.normal}x\n8\n9\n10')
-    lines = block.display(height,width,term=term)
+    lines = block.display(height,width,0,0,term=None)
     for line in lines:
         print(line.format(t=term))
 
-    term = Terminal()
     block = Block("you", left_border='*', right_border="x",  top_border='a', bottom_border='z', title="This is it.", hjust='>')
     block.update('the{t.yellow}s{}e')
-    lines = block.display(height,width,term=term)
+    lines = block.display(height,width,0,0)
     for line in lines:
         print(line.format(t=term))
 
