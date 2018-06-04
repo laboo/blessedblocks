@@ -1,4 +1,50 @@
 from line import Line
+
+class Arrangement(object):
+    def __init__(self, layout=None, blocks=None):
+        if (layout or blocks) and not (layout and blocks):
+            raise ValueError('Arrangement arguments must both exist or both not exist.')
+        self._slots = {}
+        self._layout = layout if layout else []
+        self._index = 0
+        self._load(self._layout, blocks)
+
+    def _load(self, layout, blocks=None):
+        for element in layout:
+            if type(element) == int:
+                if element in self._slots:
+                    raise ValueError('numbers embedded in arrangement must not have duplicates')
+                self._index = max(self._index, element) + 1
+                self._slots[element] = blocks[element] if blocks and element in blocks else None
+            elif type(element) in (list, tuple):
+                if len(element) == 0:
+                    raise ValueError('lists and tuples embedded in arrangement must not be empty')
+                self._load(element, blocks)
+            else:
+                raise ValueError('arrangement must contain only list of numbers and tuples of numbers')
+
+    def add_under(self, block):
+        i = self._index
+        if type(self._layout) == list:
+            self._layout = tuple([self._layout, i])
+        elif type(self._layout) == tuple:
+            self._layout = self._layout.append(i)
+        else:
+            raise ValueError(type(self._layout))
+        self._index += 1
+    def add_right(self, block):
+        i = self._index
+        if type(self._layout) == list:
+            self._layout.append(i)
+        elif type(self._layout) == tuple:
+            self._layout = [self._layout, i]
+        else:
+            raise ValueError(type(self._layout))
+        self._index += 1
+
+    def __repr__(self):
+        return str(self._layout)
+
 class Block(object):
     MIDDLE_DOT = u'\u00b7'
     def __init__(self, name,
@@ -8,7 +54,8 @@ class Block(object):
                  left_border=MIDDLE_DOT,
                  right_border=MIDDLE_DOT,
                  hjust='<',
-                 vjust='^'):
+                 vjust='^',
+                 arrangement=None):
         self.name = name
         self.title = Line('{t.normal}' + title)  # TODO why do we need this???
         self.top_border = Line(top_border)
@@ -24,6 +71,7 @@ class Block(object):
         self.text = None
         self.dirty = False
         self.prev_seq = ''
+        self.arrangement = arrangement
 
     def __repr__(self):
         return ('<Block {{name={0}, title={1}, len(text)={2}, lines={3}}}>'
@@ -78,8 +126,48 @@ class Block(object):
         self.prev_seq = text.last_seq if text.last_seq else '{t.normal}'
 
         return fmt
+
+    def _display_arrangement(self, width, height, x, y, term, just_dirty=True):
+        def calc_block_size(total_size, num_blocks, block_index):
+            rem = total_size % num_blocks
+            base = total_size // num_blocks
+            return base + int(block_index < rem)
+
+        def calc_block_offset(orig_offset, total_size, num_blocks, block_index):
+            offset = orig_offset
+            for i in range(0, block_index):
+                offset += calc_block_size(total_size, num_blocks, i)
+            return offset
+
+        def dfs(layout, width, height, x, y, term, just_dirty):
+            orig_x = x
+            orig_y = y
+            h = height
+            w = width
+            for i, element in enumerate(layout):
+                if type(layout) == list:
+                    w = calc_block_size(width, len(layout), i)
+                elif type(layout) == tuple:
+                    h = calc_block_size(height, len(layout), i)
+
+                if type(layout) == list:
+                    x = calc_block_offset(orig_x, width, len(layout), i)
+                elif type(layout) == tuple:
+                    y = calc_block_offset(orig_y, height, len(layout), i)
+
+                if type(element) in (list, tuple):
+                    dfs(element, w, h, x, y, term, just_dirty)
+                else:
+                    block = self.arrangement._slots[element]
+                    if block.dirty or not just_dirty:
+                        block.display(w, h, x, y, term=term)
+
+        dfs(self.arrangement._layout, width, height, x, y, term, just_dirty)
     
-    def display(self, height, width, x, y, term=None):
+    def display(self, width, height, x, y, term=None, just_dirty=True):
+        if self.arrangement:
+            self._display_arrangement(width, height, x, y, term, just_dirty)
+            
         self.dirty = False
         out = []
         if self.text is not None and len(self.text) != 0:
@@ -177,7 +265,19 @@ class Block(object):
         else:
             return out  # for testing purposes mostly
 
+
 def main():
+    blocks = [Block('b1'), Block('b2'), Block('b3')]
+    layout = [(0,1), 2]
+    arr = Arrangement(layout,blocks)
+    print(arr)
+    arr.add_right(Block('b4'))
+    print(arr)
+    arr.add_under(Block('b5'))
+    print(arr)
+    b1 = Block("hi", arrangement=arr)
+    print(b1.arrangement)
+    exit()
     import sys
     from blessed import Terminal
     
@@ -187,19 +287,19 @@ def main():
     
     block = Block("me", left_border='*', right_border="x",  top_border='a', bottom_border='z', title="This is it.", hjust='>')
     block.update('hi\nthere\nyou\n01}23{}{4567890\n\n6th\n7th\n8\n9\n10')
-    lines = block.display(height,width,0,0)
+    lines = block.display(width,height,0,0)
     for line in lines:
         print(line.format(t=term))
 
     block = Block("you", left_border='*', right_border="x",  top_border='a', bottom_border='z', title="This is it.", hjust='>')
     block.update('hi\nthe{t.yellow}re\nyo}{u\n{t.blue}0123{t.red}4567890\n\n6th\n7th{t.normal}x\n8\n9\n10')
-    lines = block.display(height,width,0,0,term=None)
+    lines = block.display(width,height,0,0,term=None)
     for line in lines:
         print(line.format(t=term))
 
     block = Block("you", left_border='*', right_border="x",  top_border='a', bottom_border='z', title="This is it.", hjust='>')
     block.update('the{t.yellow}s{}e')
-    lines = block.display(height,width,0,0)
+    lines = block.display(width,height,0,0)
     for line in lines:
         print(line.format(t=term))
 

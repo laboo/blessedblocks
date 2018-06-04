@@ -2,7 +2,7 @@
 import sys
 sys.path.append("/home/mlibucha/Envs/bb/blessedblocks/blessedblocks")
 # First two lines not needed if blessedblocks modules is installed
-from blessedblocks.block import Block
+from blessedblocks.block import Block, Arrangement
 from blessedblocks.grid import Grid
 from threading import Event, Thread, Lock
 import signal
@@ -56,7 +56,7 @@ blocks[4] = Block('Block4',
                   hjust='^',
                   vjust='=',
                   title='The Current Time centered') # updated in loop below
-
+blocks[4].update(str(datetime.datetime.now()))
 blocks[5] = Block('Block5', title='Block #5')
 blocks[5].update(FILLER)
 
@@ -82,18 +82,26 @@ blocks[8] = Block('Block8', # text in center of block
                   title='Tabulate hjust=^, vjust==')
 blocks[8].update(tabulate(table, headers=headers))
 
+x = Arrangement(layout=arrangement, blocks=blocks)
+bx = Block("", arrangement=x)
+term = Terminal()
+#bx.display(term.width, term.height, 0, 0, term)
+#stop.wait(5)
+#exit()
 # Main logic
-g = Grid(arrangement, blocks)
+g = Grid(bx)
 signal.signal(signal.SIGINT, on_kill)
 g.start()
-g.update_block(4, str(datetime.datetime.now()))
+#g.update_block(4, str(datetime.datetime.now()))
 stop.wait(15)
-a2 = [2,3,4]
-g.load(a2, blocks)
+#a2 = [2,3,4]
+#g.load(a2, blocks)
 
 for _ in range(15):
-    g.update_block(4, str(datetime.datetime.now()))
+    #g.update_block(4, str(datetime.datetime.now()))
+    blocks[4].update(str(datetime.datetime.now()))
     stop.wait(1)
+    bx.display(term.width, term.height, 0, 0, term)
 g.stop()
 
 
