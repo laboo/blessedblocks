@@ -1,10 +1,13 @@
-from blessedblocks.block import Block
+#!/usr/bin/python3
+import os, sys
+sys.path.append(os.path.join(os.path.dirname(__file__), "blessedblocks"))
+# Previous two lines not needed if blessedblocks modules is installed
+from blessedblocks.block import Block, Arrangement
 from blessedblocks.grid import Grid
 from threading import Event, Thread, Lock
-import signal
 from tabulate import tabulate
 import datetime
-from blessed import Terminal
+
 # Some constants
 POUND = '#'
 FILLER = ('01234}6789012345678901234567890123456789\n'
@@ -18,11 +21,7 @@ FILLER = ('01234}6789012345678901234567890123456789\n'
           '8123456789012345678901234567890123456789\n'
           '9123{t.blue}456789012345678901234567890123456789\n')
 
-# Catch a ^C and shut down gracefully
-stop = Event()
-def on_kill(*args):
-    g.stop()
-    stop.set()
+
 
 # Specify the positioning of the blocks.
 # A list is horizontal, a tuple is vertical
@@ -52,7 +51,7 @@ blocks[4] = Block('Block4',
                   hjust='^',
                   vjust='=',
                   title='The Current Time centered') # updated in loop below
-
+blocks[4].update(str(datetime.datetime.now()))
 blocks[5] = Block('Block5', title='Block #5')
 blocks[5].update(FILLER)
 
@@ -78,18 +77,29 @@ blocks[8] = Block('Block8', # text in center of block
                   title='Tabulate hjust=^, vjust==')
 blocks[8].update(tabulate(table, headers=headers))
 
-# Main logic
-g = Grid(arrangement, blocks)
-signal.signal(signal.SIGINT, on_kill)
-g.start()
-g.update_block(4, str(datetime.datetime.now()))
-stop.wait(15)
-a2 = [2,3,4]
-g.load(a2, blocks)
+a = Arrangement(layout=arrangement, blocks=blocks)
+ba = Block("", arrangement=a)
 
-for _ in range(15):
-    g.update_block(4, str(datetime.datetime.now()))
-    stop.wait(1)
+# Main logic
+stop_event = Event()
+g = Grid(ba, stop_event=stop_event)
+
+g.start()
+
+for i in range(30):
+    stop_event.wait(1)
+    blocks[4].update(str(datetime.datetime.now()))
+    g.update_block(4, blocks[4])
+
+a2 = Arrangement(layout=[2,3,4], blocks=blocks)
+g.load(a2)
+
+for i in range(30):
+    stop_event.wait(1)
+    blocks[4].update(str(datetime.datetime.now()))
+    g.update_block(4, blocks[4])
+
+stop_event.wait(3)
 g.stop()
 
 
