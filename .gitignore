@@ -1,0 +1,11 @@
+.cache
+*.pyc
+__pycache__
+.pytest_cache
+*~
+.eggs
+dist/
+*.egg-info/
+.idea/
+.tox/
+doc/
