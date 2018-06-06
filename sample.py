@@ -86,16 +86,16 @@ g = Grid(ba, stop_event=stop_event)
 
 g.start()
 
-for i in range(30):
-    stop_event.wait(1)
+for i in range(300):
+    stop_event.wait(.1)
     blocks[4].update(str(datetime.datetime.now()))
     g.update_block(4, blocks[4])
 
 a2 = Arrangement(layout=[2,3,4], blocks=blocks)
 g.load(a2)
 
-for i in range(30):
-    stop_event.wait(1)
+for i in range(300):
+    stop_event.wait(.1)
     blocks[4].update(str(datetime.datetime.now()))
     g.update_block(4, blocks[4])
 
