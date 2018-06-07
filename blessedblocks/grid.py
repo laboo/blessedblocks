@@ -4,7 +4,9 @@ from block import Block
 from math import floor, ceil
 from threading import Event, Thread, RLock
 from copy import deepcopy
+from time import sleep
 import signal
+
 
 class Grid(object):
     def __init__(self, block, stop_event=None):
@@ -49,6 +51,7 @@ class Grid(object):
         signal.signal(signal.SIGINT, self._on_kill)
 
         self._thread.start()
+        sleep(1)  # let the term update before introducing the command line
         self._input.start()
 
     def stop(self, *args):
