@@ -3,20 +3,20 @@ from blessed import Terminal
 from block import Block
 from math import floor, ceil
 from threading import Event, Thread, RLock
-from copy import deepcopy
 from time import sleep
 import signal
 
 
 class Grid(object):
     def __init__(self, block, stop_event=None):
-        self._block = deepcopy(block)
+        self._block = block
         self._refresh = Event()
         self._done = Event()
         self._term = Terminal()
         self._lock = RLock()
         self._stop_event = stop_event
         self._not_just_dirty = Event()
+        self.load(self._block.arrangement)
 
     def __repr__(self):
         return 'grid'
@@ -89,12 +89,15 @@ class Grid(object):
 
     def update_block(self, index, block):
         with self._lock:
-            self._block.arrangement._slots[index] = deepcopy(block)
+            self._block.arrangement._slots[index] = block
+            block.set_dirty_event(self._refresh)
         self.update()
 
     def load(self, arrangement):
         with self._lock:
-            self._block.arrangement = deepcopy(arrangement)
+            self._block.arrangement = arrangement
+            for _, block in self._block.arrangement._slots.items():
+                block.set_dirty_event(self._refresh)
         self.update_all()
 
     def _input(self):

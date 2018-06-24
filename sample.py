@@ -21,11 +21,9 @@ FILLER = ('01234}6789012345678901234567890123456789\n'
           '8123456789012345678901234567890123456789\n'
           '9123{t.blue}456789012345678901234567890123456789\n')
 
-
-
 # Specify the positioning of the blocks.
 # A list is horizontal, a tuple is vertical
-arrangement = [(1,2,3), (4,8), (5,[6,7])]
+arrangement = [(1,2,3), (4,8,9), (5,[6,7])]
 
 # Build the contents of each of the blocks specified in the arrangement
 blocks = {}
@@ -67,6 +65,7 @@ blocks[7].update(FILLER)
 headers=["Planet","R (km)", "mass (x 10^29 kg)"]
 table = [["Sun",696000,1989100000],["Earth",6371,5973.6],
          ["Moon",1737,73.5],["Mars",3390,641.85]]
+
 blocks[8] = Block('Block8', # text in center of block
                   left_border='{t.blue}# ',
                   right_border='{t.green} #',
@@ -76,6 +75,19 @@ blocks[8] = Block('Block8', # text in center of block
                   vjust='=',
                   title='Tabulate hjust=^, vjust==')
 blocks[8].update(tabulate(table, headers=headers))
+
+
+# Create an embedded block with its own arrangement
+eblocks = {}
+eblocks[1] = Block('eblock1', title='eblock1')
+eblocks[2] = Block('eblock2', title='eblock2')
+eblocks[1].update("some text")
+eblocks[2].update("more text")
+
+ea = Arrangement(layout=[(1,2)], blocks=eblocks)
+bb = Block("embedded", arrangement=ea)
+
+blocks[9] = bb  # stick it in slot 9
 
 a = Arrangement(layout=arrangement, blocks=blocks)
 ba = Block("", arrangement=a)
@@ -89,17 +101,16 @@ g.start()
 for i in range(300):
     stop_event.wait(.1)
     blocks[4].update(str(datetime.datetime.now()))
-    g.update_block(4, blocks[4])
+    eblocks[1].update(str(i))
 
-a2 = Arrangement(layout=[2,3,4], blocks=blocks)
+# Replace the entire arrangement
+a2 = Arrangement(layout=[2,3,4,9], blocks=blocks)
 g.load(a2)
 
 for i in range(300):
     stop_event.wait(.1)
     blocks[4].update(str(datetime.datetime.now()))
-    g.update_block(4, blocks[4])
 
-stop_event.wait(3)
 g.stop()
 
 

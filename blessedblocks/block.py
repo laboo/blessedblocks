@@ -73,6 +73,7 @@ class Block(object):
         self.vjust = vjust
         self.text = None
         self.dirty = True
+        self.dirty_event = None
         self.prev_seq = ''
         self.arrangement = arrangement
 
@@ -82,12 +83,17 @@ class Block(object):
                         self.title.plain,
                         len(self.text) if self.text else 0,
                         len(self.text.split('\n')) if self.text else 0))
-    
+
+    def set_dirty_event(self, event):
+        self.dirty_event = event
+
     def update(self, text):
         with Block.write_lock:
             if self.text != text:
-                self.dirty = True
                 self.text = text
+                self.dirty = True
+                if self.dirty_event:
+                    self.dirty_event.set()
 
     def _build_horiz_border(self, text, width):
         if not text:
@@ -163,6 +169,8 @@ class Block(object):
                     dfs(element, w, h, x, y, term, just_dirty)
                 else:
                     block = self.arrangement._slots[element]
+                    if block.arrangement:
+                        block._display_arrangement(w, h, x, y, term, just_dirty)
                     with Block.write_lock:
                         if block.dirty or not just_dirty:
                             block.display(w, h, x, y, term=term)
