@@ -233,7 +233,8 @@ class Block(object):
                         remaining_rows -= 1
 
                 # Titles are always centered. This is not configurable.
-                if len(self.title.plain) and remaining_rows:
+
+                if len(self.title._text) and remaining_rows:
                     line = self._build_line(self.title, width, width, tjust='^', term=term)
                     if line:
                         out.append(line)
