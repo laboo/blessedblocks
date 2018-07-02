@@ -1,5 +1,8 @@
 from line import Line
 from threading import RLock
+from collections import namedtuple
+
+SizePref = namedtuple('SizePref', 'soft_min min_req max_req soft_max')
 
 class Arrangement(object):
 
@@ -56,8 +59,13 @@ class Block(object):
                  bottom_border=MIDDLE_DOT,
                  left_border=MIDDLE_DOT,
                  right_border=MIDDLE_DOT,
-                 hjust='<',
-                 vjust='^',
+                 hjust='<',  # horizontoall left-justified with in block
+                 vjust='^',  # vertically centered with in block
+                 # The SizePrefs indicate how much screen real estate (width and height) this
+                 # block desires/requires when displayed. Here, we default the block to
+                 # as-much-as-you-got-but-none-is-fine.
+                 w_sizepref = SizePref(soft_min=True, min_req=0, max_req=float('inf'), soft_max=True),
+                 h_sizepref = SizePref(soft_min=True, min_req=0, max_req=float('inf'), soft_max=True),
                  arrangement=None):
         self.name = name
         self.title = Line('{t.normal}' + title)  # TODO why do we need this???
@@ -75,6 +83,8 @@ class Block(object):
         self.dirty = True
         self.dirty_event = None
         self.prev_seq = ''
+        self.w_sizepref = w_sizepref
+        self.h_sizepref = h_sizepref
         self.arrangement = arrangement
 
     def __repr__(self):
@@ -179,105 +189,102 @@ class Block(object):
     
     def display(self, width, height, x, y, term=None, just_dirty=True):
         with Block.write_lock:
-            if self.arrangement:
-                self._display_arrangement(width, height, x, y, term, just_dirty)
-            else:
-                self.dirty = False
-                out = []
-                if self.text is not None and len(self.text) != 0:
-                    available_for_text_rows = max(0,(height
-                                                     - (1 if self.top_border else 0)
-                                                     - (1 if self.bottom_border else 0)
-                                                     - (2 if len(self.title.plain) else 0)))
-                    available_for_text_cols = max(0, (width
-                                                      - len(self.left_border.plain)
-                                                      - len(self.right_border.plain)))
+            self.dirty = False
+            out = []
+            if self.text is not None and len(self.text) != 0:
+                available_for_text_rows = max(0,(height
+                                                 - (1 if self.top_border else 0)
+                                                 - (1 if self.bottom_border else 0)
+                                                 - (2 if len(self.title.plain) else 0)))
+                available_for_text_cols = max(0, (width
+                                                  - len(self.left_border.plain)
+                                                  - len(self.right_border.plain)))
 
-                    all_btext_rows = []
-                    for row in self.text.rstrip().split('\n'):
-                        all_btext_rows.append(Line(row))
-                    usable_btext_rows = all_btext_rows[:available_for_text_rows]
+                all_btext_rows = []
+                for row in self.text.rstrip().split('\n'):
+                    all_btext_rows.append(Line(row))
+                usable_btext_rows = all_btext_rows[:available_for_text_rows]
             
-                    # Calculate the values for adjusting the text horizonally within the block
-                    # if there's extra space in the columns for all rows.
-                    max_col_len = 0
-                    for brow in all_btext_rows:
-                        max_col_len = max(max_col_len, len(brow.plain))
-                    col_pad = max(0, available_for_text_cols - max_col_len)
+                # Calculate the values for adjusting the text horizonally within the block
+                # if there's extra space in the columns for all rows.
+                max_col_len = 0
+                for brow in all_btext_rows:
+                    max_col_len = max(max_col_len, len(brow.plain))
+                col_pad = max(0, available_for_text_cols - max_col_len)
 
-                    # Calculate the values for adjusting the text vertically within the block
-                    # if there's extra empty rows.
-                    ver_pad = max(0, (available_for_text_rows - len(all_btext_rows)))
-                    top_ver_pad = 0
-                    if self.vjust == '=':
-                        top_ver_pad = ver_pad // 2
-                    elif self.vjust == 'v':
-                        top_ver_pad = ver_pad
+                # Calculate the values for adjusting the text vertically within the block
+                # if there's extra empty rows.
+                ver_pad = max(0, (available_for_text_rows - len(all_btext_rows)))
+                top_ver_pad = 0
+                if self.vjust == '=':
+                    top_ver_pad = ver_pad // 2
+                elif self.vjust == 'v':
+                    top_ver_pad = ver_pad
 
-                    # Finally, build the block from top to bottom, adding each next line
-                    # if there's room for it. The bottom gets cut off if there's not enough room.
-                    # This behavior (cutting from the bottom) is not configurable.
-                    line = None
-                    remaining_rows = height
-                    if self.top_border is not None and remaining_rows:
-                        line = self._build_horiz_border(self.top_border, width)
-                        if line:
-                            out.append(line)
-                            remaining_rows -= 1
-
-                    # Titles are always centered. This is not configurable.
-                    if len(self.title.plain) and remaining_rows:
-                        line = self._build_line(self.title, width, width, tjust='^', term=term)
-                        if line:
-                            out.append(line)
-                            remaining_rows -= 1
-                            line = self._build_line(Line('-' * available_for_text_cols), width, width, term=term)
-                            if remaining_rows:
-                                out.append(line)
-                                remaining_rows -= 1
-
-                    # By default, empty rows fill out the bottom of the block.
-                    # Here we move some of them up above the text if we need to.
-                    ver_pad_count = top_ver_pad
-                    while ver_pad_count and remaining_rows:
-                        line = self._build_line(Line(' '), available_for_text_cols, width, term=term)
+                # Finally, build the block from top to bottom, adding each next line
+                # if there's room for it. The bottom gets cut off if there's not enough room.
+                # This behavior (cutting from the bottom) is not configurable.
+                line = None
+                remaining_rows = height
+                if self.top_border is not None and remaining_rows:
+                    line = self._build_horiz_border(self.top_border, width)
+                    if line:
                         out.append(line)
-                        ver_pad_count -= 1
                         remaining_rows -= 1
 
-                    # This is the main text of the block
-                    for i in range(max(0,available_for_text_rows - top_ver_pad)):
-                        if remaining_rows <= 0:
-                            break
-                        line = ''
-                        if i >= len(usable_btext_rows):
-                            line = self._build_line(Line(' '), width, width, term=term)
-                        else:
-                            line = self._build_line(usable_btext_rows[i], available_for_text_cols, width, padding=col_pad, term=term)
-                        if line:
+                # Titles are always centered. This is not configurable.
+                if len(self.title.plain) and remaining_rows:
+                    line = self._build_line(self.title, width, width, tjust='^', term=term)
+                    if line:
+                        out.append(line)
+                        remaining_rows -= 1
+                        line = self._build_line(Line('-' * available_for_text_cols), width, width, term=term)
+                        if remaining_rows:
                             out.append(line)
                             remaining_rows -= 1
 
-                    # Add the bottom border
-                    if self.bottom_border is not None and remaining_rows:
-                        line = self._build_horiz_border(self.bottom_border, width)
-                        if line:
-                            out.append(line)
-                            remaining_rows -= 1
-                if len(out):
-                    out[0] = '{t.normal}' + out[0]
-                    out[-1] += '{t.normal}'
+                # By default, empty rows fill out the bottom of the block.
+                # Here we move some of them up above the text if we need to.
+                ver_pad_count = top_ver_pad
+                while ver_pad_count and remaining_rows:
+                    line = self._build_line(Line(' '), available_for_text_cols, width, term=term)
+                    out.append(line)
+                    ver_pad_count -= 1
+                    remaining_rows -= 1
 
-                if term:
-                    for j, line in enumerate(out):
-                        with term.location(x=x, y=y+j):
-                            # Can debug here by printing to a file
-                            try:
-                                print(line.rstrip().format(t=term), end='')
-                            except ValueError:
-                                raise ValueError(line.rstrip())
-                else:
-                    return out  # for testing purposes mostly
+                # This is the main text of the block
+                for i in range(max(0,available_for_text_rows - top_ver_pad)):
+                    if remaining_rows <= 0:
+                        break
+                    line = ''
+                    if i >= len(usable_btext_rows):
+                        line = self._build_line(Line(' '), width, width, term=term)
+                    else:
+                        line = self._build_line(usable_btext_rows[i], available_for_text_cols, width, padding=col_pad, term=term)
+                    if line:
+                        out.append(line)
+                        remaining_rows -= 1
+
+                # Add the bottom border
+                if self.bottom_border is not None and remaining_rows:
+                    line = self._build_horiz_border(self.bottom_border, width)
+                    if line:
+                        out.append(line)
+                        remaining_rows -= 1
+            if len(out):
+                out[0] = '{t.normal}' + out[0]
+                out[-1] += '{t.normal}'
+
+            if term:
+                for j, line in enumerate(out):
+                    with term.location(x=x, y=y+j):
+                        # Can debug here by printing to a file
+                        try:
+                            print(line.rstrip().format(t=term), end='')
+                        except ValueError:
+                            raise ValueError(line.rstrip())
+            else:
+                return out  # for testing purposes mostly
 
 def main():
     blocks = [Block('b1'), Block('b2'), Block('b3')]
