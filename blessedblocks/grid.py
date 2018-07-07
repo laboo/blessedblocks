@@ -32,8 +32,8 @@ import signal
 
 class Plot(object):
     def __init__(self,
-                 w_sizepref=SizePref(True,0,float('inf'),True),
-                 h_sizepref=SizePref(True,0,float('inf'),True),
+                 w_sizepref=SizePref(hard_min=0, hard_max=[]),
+                 h_sizepref=SizePref(hard_min=0, hard_max=[]),
                  horizontal=True,
                  subplots=None,
                  block = None):
@@ -65,7 +65,7 @@ class Grid(object):
         self._not_just_dirty = Event()
         self._root_plot = None
         self.load(self._block.arrangement)
-        
+
     def __repr__(self):
         return 'grid'
 
@@ -129,7 +129,7 @@ class Grid(object):
                         self._not_just_dirty.clear()
                     else:
                         just_dirty = True
-
+                    self.load(self._block.arrangement)
                     self.display_plot(self._root_plot,
                                       0, 0,                                   # x, y
                                       self._term.width, self._term.height-1,  # w, h
@@ -153,7 +153,7 @@ class Grid(object):
             layout = self._block.arrangement._layout
             blocks = self._block.arrangement._slots
             self._root_plot = self.build_plot(layout, blocks)
-        self.update_all()
+        #self.update_all()
 
     def _input(self):
         with self._term.cbreak():
@@ -185,11 +185,49 @@ class Grid(object):
     # result in the Plot containing the blocks. When this completes, we can use the
     # resulting plot tree to display the Grid.
     def build_plot(self, layout, blocks, horizontal=True):
+        def merge_sizeprefs(plots):
+            w_hard_min, w_hard_max, h_hard_min, h_hard_max = 0, [], 0, []
+            # Hard maxes merge only if *all* subplots have a hard_max set
+            num_w_hard_maxes, num_h_hard_maxes = 0, 0
+            for plot in subplots:
+                w_hard_min += plot.w_sizepref.hard_min
+                if plot.w_sizepref.hard_max: num_w_hard_maxes += 1
+                w_hard_max += plot.w_sizepref.hard_max
+                h_hard_min += plot.h_sizepref.hard_min
+                if plot.h_sizepref.hard_max: num_h_hard_maxes += 1
+                h_hard_max += plot.h_sizepref.hard_max
+            w_hard_max = w_hard_max if num_w_hard_maxes == len(subplots) else []
+            h_hard_max = h_hard_max if num_h_hard_maxes == len(subplots) else []
+            w_sizepref = SizePref(hard_min=w_hard_min,
+                                  hard_max=w_hard_max)
+            h_sizepref = SizePref(hard_min=h_hard_min,
+                                  hard_max=h_hard_max)
+            return w_sizepref, h_sizepref
+
         subplots = []
         if not layout:
             for _, block in blocks.items():
-                # if there's no arrangement there's only one block
-                return Plot(block.w_sizepref, block.h_sizepref, block=block)
+                # if there's no arrangement there's only one block.
+                # merge its sizeprefs (which contain numbers) into
+                # new sizeprefs containing lists.
+                hard_max = []
+                if block.w_sizepref.hard_max == 'text':
+                    hard_max = [block.text_cols]
+                elif block.w_sizepref.hard_max != float('inf'):
+                    hard_max = [block.w_sizepref.hard_max]
+                w_sizepref = SizePref(hard_min=block.w_sizepref.hard_min,
+                                      hard_max=hard_max)
+
+                hard_max = []
+                if block.h_sizepref.hard_max == 'text':
+                    hard_max = [block.text_rows]
+                elif block.h_sizepref.hard_max != float('inf'):
+                    hard_max = [block.h_sizepref.hard_max]
+                h_sizepref = SizePref(hard_min=block.h_sizepref.hard_min,
+                                      hard_max=hard_max)
+
+                # This return is purposely *inside* the loop
+                return Plot(w_sizepref, h_sizepref, block=block)
         for element in layout:
             if type(element) == int:
                 block = blocks[element]
@@ -202,9 +240,8 @@ class Grid(object):
                orientation = type(element) == list
                subplot = self.build_plot(element, blocks, orientation)
             subplots.append(subplot)
-        # TODO calculate these from the subplots!
-        w_sizepref = SizePref(True, 0, float('inf'), False)
-        h_sizepref = SizePref(True, 0, float('inf'), False)
+
+        w_sizepref, h_sizepref = merge_sizeprefs(subplots)
         return Plot(w_sizepref, h_sizepref, horizontal=horizontal, subplots=subplots)
 
     # Display the plot by recursing down the plot tree built by
@@ -219,31 +256,105 @@ class Grid(object):
 
     # Divvy up the space available to a series of plots among them
     # by referring to SizePrefs for each.
-    def divvy(self, plots, x, y, width, height, horizontal):
+    def divvy(self, plots, x, y, w, h, horizontal):
         def calc_block_size(total_size, num_blocks, block_index):
             rem = total_size % num_blocks
             base = total_size // num_blocks
             return base + int(block_index < rem)
 
-        def calc_block_offset(orig_offset, total_size, num_blocks, block_index):
-            offset = orig_offset
-            for i in range(0, block_index):
-                offset += calc_block_size(total_size, num_blocks, i)
-            return offset
-        out = []
+        n = len(plots)
+        memo = [[]] * n
+        for i in range(n):
+            memo[i] = {'x':0, 'y':0, 'w':0, 'h':0}
+
+        # handle hard_min first, but save off hard_maxes
+        rem = w if horizontal else h  # remaining space to divvy
+        hard_maxes = []
+        unmet_hard_maxes_indexes = set()
+        free_indexes = set()
         for i, plot in enumerate(plots):
             if horizontal:
-                new_w = calc_block_size(width, len(plots), i)
-                new_h = height
-                new_x = calc_block_offset(x, width, len(plots), i)
-                new_y = y
+                prefs, xy, wh = plot.w_sizepref, 'x', 'w'
             else:
-                new_w = width
-                new_h = calc_block_size(height, len(plots), i)
-                new_x = x
-                new_y = calc_block_offset(y, height, len(plots), i)
-            out.append((plot, new_x, new_y, new_w, new_h))
+                prefs, xy, wh = plot.h_sizepref, 'y', 'h'
+            rem -= prefs.hard_min  # could be zero
+            memo[i][wh] += prefs.hard_min
+            if prefs.hard_max:
+                total_hard_max = sum(prefs.hard_max)
+                # hard_maxes is a tuple: (remaining_required, plot_index)
+                hard_maxes.append((max(0, (total_hard_max - memo[i][wh])), i))
+                if memo[i][wh] < total_hard_max:
+                    #hard_maxes.append((total_hard_max,i))
+                    unmet_hard_maxes_indexes.add(i)
+            else:
+                free_indexes.add(i)
+
+        # short circuit
+        if rem < 0:
+            raise Exception('not enough space for blocks min requirements')
+        elif rem > 0:  # if rem == 0, we're done
+            # Now deal with hard_max
+            watermark = 0
+            for num, index in sorted(hard_maxes):
+                # if this hard max has been satisfied already, move passed it
+                if num <= watermark:
+                    continue
+                unsatisfied_hard_maxes = len(hard_maxes) - index
+                satisfied_hard_maxes = len(hard_maxes) - unsatisfied_hard_maxes
+                new_amount = num - watermark
+                # Is rem large enough that everyone can take on the new amount?
+                if (rem // (n - satisfied_hard_maxes)) < new_amount:
+                    # no. we're done. just split the remaining space fairly
+                    break
+                else:
+                    watermark = num
+
+            # All max(watermark/hard_max) to every plot.
+            for i, plot in enumerate(plots):
+                if horizontal:
+                    prefs, xy, wh = plot.w_sizepref, 'x', 'w'
+                else:
+                    prefs, xy, wh = plot.h_sizepref, 'y', 'h'
+                if not prefs.hard_max:
+                    alloc = watermark
+                else:
+                    hard_max_target = sum(prefs.hard_max) - memo[i][wh]
+                    alloc = min(watermark, hard_max_target)
+                    if alloc > 0:
+                        if alloc == hard_max_target:
+                            unmet_hard_maxes_indexes.remove(i)  # hard_max has been met for this plot
+                memo[i][wh] += max(0, alloc)
+                rem -= alloc
+            if rem:  # rem can't be < 0
+                # mins and maxes have all been accounted for
+                rem_copy = rem
+                total_unmet = n - (len(hard_maxes) - len(unmet_hard_maxes_indexes))
+                for i in range(n):
+                    if i not in unmet_hard_maxes_indexes and i not in free_indexes:
+                        continue
+                    add = calc_block_size(rem_copy, total_unmet, i)
+                    memo[i]['w' if horizontal else 'h'] += add
+                    rem -= add
+            assert(rem == 0), rem
+
+        # Calculate x,y and bundle for return
+        out = []
+        count_x, count_y = x, y
+        for i, plot in enumerate(plots):
+            m = memo[i]
+            if horizontal:
+                m['x'] = count_x
+                count_x += m['w']
+                m['y'] = y
+                m['h'] = h
+            else:
+                m['y'] = count_y
+                count_y += m['h']
+                m['x'] = x
+                m['w'] = w
+            out.append((plot, m['x'], m['y'], m['w'], m['h']))
         return out
+
 if __name__ == '__main__':
     blocks = {}
     blocks[1] = Block('blx')

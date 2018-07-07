@@ -2,7 +2,7 @@
 import os, sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "blessedblocks"))
 # Previous two lines not needed if blessedblocks modules is installed
-from blessedblocks.block import Block, Arrangement
+from blessedblocks.block import Block, Arrangement, SizePref
 from blessedblocks.grid import Grid
 from threading import Event, Thread, Lock
 from tabulate import tabulate
@@ -23,13 +23,13 @@ FILLER = ('01234}6789012345678901234567890123456789\n'
 
 # Specify the positioning of the blocks.
 # A list is horizontal, a tuple is vertical
-arrangement = [(1,2,3), (4,8,9), (5,[6,7])]
+arrangement = [(4, [(1,2,3), (8,9), (5,[6,7])])]
 
 # Build the contents of each of the blocks specified in the arrangement
 blocks = {}
 
 blocks[1] = Block('Block1') # all the defaults
-blocks[1].update("A block with no title\n" + FILLER)
+blocks[1].update("{t.normal}A block with no title\n" + FILLER)
 
 blocks[2] = Block('Block with colors in title.',
                   title='{t.cyan}Block {t.red}#2{t.normal}',
@@ -46,11 +46,19 @@ blocks[3] = Block('Block3',
 blocks[3].update(FILLER)
 
 blocks[4] = Block('Block4',
+                  left_border=None,
+                  right_border=None,
+                  top_border=None,
+                  bottom_border=None,
                   hjust='^',
                   vjust='=',
-                  title='The Current Time centered') # updated in loop below
+                  h_sizepref = SizePref(hard_min=0, hard_max=1),
+                  #title='The Current Time centered') # updated in loop below
+                  title='')
 blocks[4].update(str(datetime.datetime.now()))
-blocks[5] = Block('Block5', title='Block #5')
+blocks[5] = Block('Block5', title='Block #5',
+                  h_sizepref = SizePref(hard_min=0, hard_max='text')
+                  )
 blocks[5].update(FILLER)
 
 blocks[6] = Block("tabulate block hjust=^", # text at bottom of block

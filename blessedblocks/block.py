@@ -2,7 +2,7 @@ from line import Line
 from threading import RLock
 from collections import namedtuple
 
-SizePref = namedtuple('SizePref', 'soft_min min_req max_req soft_max')
+SizePref = namedtuple('SizePref', 'hard_min hard_max')
 
 class Arrangement(object):
 
@@ -64,8 +64,8 @@ class Block(object):
                  # The SizePrefs indicate how much screen real estate (width and height) this
                  # block desires/requires when displayed. Here, we default the block to
                  # as-much-as-you-got-but-none-is-fine.
-                 w_sizepref = SizePref(soft_min=True, min_req=0, max_req=float('inf'), soft_max=True),
-                 h_sizepref = SizePref(soft_min=True, min_req=0, max_req=float('inf'), soft_max=True),
+                 w_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
+                 h_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
                  arrangement=None):
         self.name = name
         self.title = Line('{t.normal}' + title)  # TODO why do we need this???
@@ -80,6 +80,8 @@ class Block(object):
             raise ValueError("Invalid vjust value, must be '^', '=', or 'v'")
         self.vjust = vjust
         self.text = None
+        self.text_rows = 0
+        self.text_cols = 0
         self.dirty = True
         self.dirty_event = None
         self.prev_seq = ''
@@ -101,6 +103,15 @@ class Block(object):
         with Block.write_lock:
             if self.text != text:
                 self.text = text
+                rows = text.split('\n')
+                self.text_cols = max(map(len, rows))
+                self.text_rows = len(rows)
+                if self.title:
+                    self.text_rows += 2
+                if self.top_border:
+                    self.text_rows += 1
+                if self.bottom_border:
+                    self.text_rows += 1
                 self.dirty = True
                 if self.dirty_event:
                     self.dirty_event.set()
@@ -147,46 +158,6 @@ class Block(object):
 
         return fmt
 
-    def _display_arrangement(self, width, height, x, y, term, just_dirty=True):
-        def calc_block_size(total_size, num_blocks, block_index):
-            rem = total_size % num_blocks
-            base = total_size // num_blocks
-            return base + int(block_index < rem)
-
-        def calc_block_offset(orig_offset, total_size, num_blocks, block_index):
-            offset = orig_offset
-            for i in range(0, block_index):
-                offset += calc_block_size(total_size, num_blocks, i)
-            return offset
-
-        def dfs(layout, width, height, x, y, term, just_dirty):
-            orig_x = x
-            orig_y = y
-            h = height
-            w = width
-            for i, element in enumerate(layout):
-                if type(layout) == list:
-                    w = calc_block_size(width, len(layout), i)
-                elif type(layout) == tuple:
-                    h = calc_block_size(height, len(layout), i)
-
-                if type(layout) == list:
-                    x = calc_block_offset(orig_x, width, len(layout), i)
-                elif type(layout) == tuple:
-                    y = calc_block_offset(orig_y, height, len(layout), i)
-
-                if type(element) in (list, tuple):
-                    dfs(element, w, h, x, y, term, just_dirty)
-                else:
-                    block = self.arrangement._slots[element]
-                    if block.arrangement:
-                        block._display_arrangement(w, h, x, y, term, just_dirty)
-                    with Block.write_lock:
-                        if block.dirty or not just_dirty:
-                            block.display(w, h, x, y, term=term)
-
-        dfs(self.arrangement._layout, width, height, x, y, term, just_dirty)
-    
     def display(self, width, height, x, y, term=None, just_dirty=True):
         with Block.write_lock:
             self.dirty = False
