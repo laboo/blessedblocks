@@ -196,8 +196,8 @@ class Grid(object):
                 h_hard_min += plot.h_sizepref.hard_min
                 if plot.h_sizepref.hard_max: num_h_hard_maxes += 1
                 h_hard_max += plot.h_sizepref.hard_max
-            w_hard_max = w_hard_max if num_w_hard_maxes == len(subplots) else []
-            h_hard_max = h_hard_max if num_h_hard_maxes == len(subplots) else []
+            w_hard_max = [max(w_hard_max)] if num_w_hard_maxes == len(subplots) else []
+            h_hard_max = [max(h_hard_max)] if num_h_hard_maxes == len(subplots) else []
             w_sizepref = SizePref(hard_min=w_hard_min,
                                   hard_max=w_hard_max)
             h_sizepref = SizePref(hard_min=h_hard_min,
@@ -335,7 +335,7 @@ class Grid(object):
                     add = calc_block_size(rem_copy, total_unmet, i)
                     memo[i]['w' if horizontal else 'h'] += add
                     rem -= add
-            assert(rem == 0), rem
+            #assert(rem == 0), rem
 
         # Calculate x,y and bundle for return
         out = []
