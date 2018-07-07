@@ -1,6 +1,7 @@
 from line import Line
 from threading import RLock
 from collections import namedtuple
+import re
 
 SizePref = namedtuple('SizePref', 'hard_min hard_max')
 
@@ -104,8 +105,15 @@ class Block(object):
             if self.text != text:
                 self.text = text
                 rows = text.split('\n')
-                self.text_cols = max(map(len, rows))
-                self.text_rows = len(rows)
+                clean_rows = []
+                for row in rows:
+                    clean_rows.append(re.sub(r'{t\..*?}', '', row))
+                self.text_cols = max(map(len, clean_rows))
+                if self.left_border:
+                    self.text_cols += 1
+                if self.right_border:
+                    self.text_cols += 1
+                self.text_rows = len(clean_rows)
                 if self.title:
                     self.text_rows += 2
                 if self.top_border:
