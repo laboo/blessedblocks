@@ -99,7 +99,6 @@ class Grid(object):
         signal.signal(signal.SIGINT, self._on_kill)
 
         self._thread.start()
-        sleep(1)  # let the term update before introducing the command line
         self._input.start()
 
     def stop(self, *args):
@@ -160,7 +159,7 @@ class Grid(object):
             val = ''
             while val.lower() != 'q':
                 print(self._term.move(self._term.height, 2) + '', end='')
-                val = self._term.inkey(timeout=.5)
+                val = self._term.inkey(timeout=.1)
                 if self._done.is_set():
                     break
                 with self._lock:
