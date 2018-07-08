@@ -277,8 +277,11 @@ class Grid(object):
                 prefs, xy, wh = plot.w_sizepref, 'x', 'w'
             else:
                 prefs, xy, wh = plot.h_sizepref, 'y', 'h'
-            rem -= prefs.hard_min  # could be zero
-            memo[i][wh] += prefs.hard_min
+
+            if rem > 0:
+                amount = min(rem, prefs.hard_min)
+                rem -= amount
+                memo[i][wh] += amount
             if prefs.hard_max:
                 total_hard_max = sum(prefs.hard_max)
                 # hard_maxes is a tuple: (remaining_required, plot_index)
@@ -289,10 +292,7 @@ class Grid(object):
             else:
                 free_indexes.add(i)
 
-        # short circuit
-        if rem < 0:
-            raise Exception('not enough space for blocks min requirements')
-        elif rem > 0:  # if rem == 0, we're done
+        if rem > 0:  # if rem == 0, we're done
             # Now deal with hard_max
             watermark = 0
             for num, index in sorted(hard_maxes):
