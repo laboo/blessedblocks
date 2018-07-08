@@ -3,8 +3,8 @@ from setuptools import find_packages, setup
 setup(
     name='blessedblocks',
     packages=find_packages(),
-    version='0.0.3',
-    description='Update a terminal window in blocks using the blessed module.',
+    version='0.0.4',
+    description='Display a terminal window in blocks using the blessed module.',
     author='Mark Libucha',
     author_email='mlibucha@gmail.com',
     url='http://nowhere.click',
