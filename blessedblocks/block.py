@@ -1,4 +1,4 @@
-from line import Line
+from .line import Line
 from threading import RLock
 from collections import namedtuple
 import re
