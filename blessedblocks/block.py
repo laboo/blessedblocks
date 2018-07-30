@@ -51,6 +51,26 @@ class Arrangement(object):
     def __repr__(self):
         return str(self._layout)
 
+from functools import wraps
+def safe_set(method):
+    @wraps(method)
+    def _impl(self, *args, **kwargs):
+        with self.write_lock:
+            method(self, *args, **kwargs)
+        try:
+            self.dirty_event.set()
+        except AttributeError:
+            pass
+    return _impl
+
+def safe_get(method):
+    @wraps(method)
+    def _impl(self, *args, **kwargs):
+        with self.write_lock:
+            r = method(self, *args, **kwargs)
+        return r
+    return _impl
+
 class Block(object):
     MIDDLE_DOT = u'\u00b7'
     write_lock = RLock()
@@ -69,26 +89,23 @@ class Block(object):
                  h_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
                  arrangement=None):
         self.name = name
-        self.title = Line('{t.normal}' + title)  # TODO why do we need this???
-        self.top_border = Line(top_border)
-        self.bottom_border = Line(bottom_border)
-        self.left_border = Line(left_border)
-        self.right_border = Line(right_border)
-        if hjust not in ('<', '^', '>'):
-            raise ValueError("Invalid hjust value, must be '<', '^', or '>'")
+        self.title = title
+        self.top_border = top_border
+        self.bottom_border = bottom_border
+        self.left_border = left_border
+        self.right_border = right_border
         self.hjust = hjust
-        if vjust not in ('^', '=', 'v'):
-            raise ValueError("Invalid vjust value, must be '^', '=', or 'v'")
         self.vjust = vjust
         self.text = None
+        self.w_sizepref = w_sizepref
+        self.h_sizepref = h_sizepref
+        self.arrangement = arrangement
+        # Below here non-thread safe attrs
         self.text_rows = 0
         self.text_cols = 0
         self.dirty = True
         self.dirty_event = None
         self.prev_seq = ''
-        self.w_sizepref = w_sizepref
-        self.h_sizepref = h_sizepref
-        self.arrangement = arrangement
 
     def __repr__(self):
         return ('<Block {{name={0}, title={1}, len(text)={2}, lines={3}}}>'
@@ -174,7 +191,7 @@ class Block(object):
                 available_for_text_rows = max(0,(height
                                                  - (1 if self.top_border else 0)
                                                  - (1 if self.bottom_border else 0)
-                                                 - (2 if len(self.title.plain) else 0)))
+                                                 - (2 if self.title and len(self.title.plain) else 0)))
                 available_for_text_cols = max(0, (width
                                                   - len(self.left_border.plain)
                                                   - len(self.right_border.plain)))
@@ -213,7 +230,7 @@ class Block(object):
 
                 # Titles are always centered. This is not configurable.
 
-                if len(self.title._text) and remaining_rows:
+                if self.title and len(self.title._text) and remaining_rows:
                     line = self._build_line(self.title, width, width, tjust='^', term=term)
                     if line:
                         out.append(line)
@@ -265,6 +282,93 @@ class Block(object):
                             raise ValueError(line.rstrip())
             else:
                 return out  # for testing purposes mostly
+
+
+    @property
+    @safe_get
+    def title(self): return self._title
+
+    @title.setter
+    @safe_set
+    def title(self, val): self._title = Line('{t.normal}' + val)  # TODO why {t.normal}?
+
+    @property
+    @safe_get
+    def top_border(self): return self._top_border
+
+    @top_border.setter
+    @safe_set
+    def top_border(self, val): self._top_border = Line(val)
+
+    @property
+    @safe_get
+    def bottom_border(self): return self._bottom_border
+
+    @bottom_border.setter
+    @safe_set
+    def bottom_border(self, val): self._bottom_border = Line(val)
+
+    @property
+    @safe_get
+    def left_border(self): return self._left_border
+
+    @left_border.setter
+    @safe_set
+    def left_border(self, val): self._left_border = Line(val)
+
+    @property
+    @safe_get
+    def right_border(self): return self._right_border
+
+    @right_border.setter
+    @safe_set
+    def right_border(self, val): self._right_border = Line(val)
+
+    @property
+    @safe_get
+    def hjust(self): return self._hjust
+
+    @hjust.setter
+    @safe_set
+    def hjust(self, val):
+        if val not in ('<', '^', '>'):
+            raise ValueError("Invalid hjust value, must be '<', '^', or '>'")
+        self._hjust = val
+
+    @property
+    @safe_get
+    def vjust(self): return self._vjust
+
+    @vjust.setter
+    @safe_set
+    def vjust(self, val):
+        if val not in ('^', '=', 'v'):
+            raise ValueError("Invalid vjust value, must be '^', '=', or 'v'")
+        self._vjust = val
+
+    @property
+    @safe_get
+    def h_sizepref(self): return self._h_sizepref
+
+    @h_sizepref.setter
+    @safe_set
+    def h_sizepref(self, val): self._h_sizepref = val
+
+    @property
+    @safe_get
+    def v_sizepref(self): return self._v_sizepref
+
+    @v_sizepref.setter
+    @safe_set
+    def v_sizepref(self, val): self._v_sizepref = val
+
+    @property
+    @safe_get
+    def arrangement(self): return self._arrangement
+
+    @arrangement.setter
+    @safe_set
+    def arrangement(self, val): self._arrangement = val
 
 def main():
     blocks = [Block('b1'), Block('b2'), Block('b3')]

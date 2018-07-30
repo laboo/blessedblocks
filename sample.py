@@ -108,6 +108,10 @@ g.start()
 
 for i in range(300):
     stop_event.wait(.1)
+    blocks[2].title = 'xxx' + str(i)
+    blocks[2].top_border = str(i%10)
+    import random
+    blocks[2].hjust = random.choice(['<', '^', '>'])
     blocks[4].update(str(datetime.datetime.now()))
     eblocks[1].update(str(i))
 
