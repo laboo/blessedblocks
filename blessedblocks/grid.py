@@ -1,6 +1,7 @@
 from __future__ import print_function
 from blessed import Terminal
 from .block import Block, Arrangement, SizePref
+from .cmd import get_cmd
 from math import floor, ceil
 from threading import Event, Thread, RLock
 from time import sleep
@@ -58,6 +59,7 @@ class Grid(object):
         self._block = block
         self._plot = Plot()
         self._refresh = Event()
+        self.app_refresh_event = Event()
         self._done = Event()
         self._term = Terminal()
         self._lock = RLock()
@@ -98,8 +100,8 @@ class Grid(object):
         signal.signal(signal.SIGWINCH, self._on_resize)
         signal.signal(signal.SIGINT, self._on_kill)
 
-        self._thread.start()
         self._input.start()
+        self._thread.start()
 
     def stop(self, *args):
         self._term.clear()
@@ -155,25 +157,13 @@ class Grid(object):
         #self.update_all()
 
     def _input(self):
-        with self._term.cbreak():
-            val = ''
-            while val.lower() != 'q':
-                print(self._term.move(self._term.height, 2) + '', end='')
-                val = self._term.inkey(timeout=.1)
+        with self._term.fullscreen():
+            while True:
                 if self._done.is_set():
                     break
-                with self._lock:
-                    if not val:
-                        # timeout
-                        with self._term.location(x=0, y=self._term.height):
-                            print('> ' + (' '  * (self._term.width - 2)), end='')
-                            continue
-                    elif val.is_sequence:
-                        with self._term.location(x=2, y=self._term.height-1):
-                            print("got sequence: {0}.".format((str(val), val.name, val.code)), end='')
-                    elif val:
-                        with self._term.location(x=2, y=self._term.height-1):
-                            print("got {0}.".format(val), end='')
+                cmd = get_cmd(self._term, self._lock, self._done, self.app_refresh_event)
+                if not cmd:
+                    self.update()
 
     # Gets called at Grid creation any time the configuration (not display)
     # of a block in the Grid gets changes. When it does, we need to rebuild

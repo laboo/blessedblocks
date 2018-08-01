@@ -107,8 +107,10 @@ g = Grid(ba, stop_event=stop_event)
 g.start()
 
 for i in range(300):
+    if g.app_refresh_event.is_set():
+        blocks[2].title = 'got event ' + str(i)
+        g.app_refresh_event.clear()
     stop_event.wait(.1)
-    blocks[2].title = 'xxx' + str(i)
     blocks[2].top_border = str(i%10)
     import random
     blocks[2].hjust = random.choice(['<', '^', '>'])
