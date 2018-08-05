@@ -3,9 +3,10 @@ from blessed import Terminal
 from .block import Block, Arrangement, SizePref
 from .cmd import get_cmd
 from math import floor, ceil
-from threading import Event, Thread, RLock
+from threading import Event, Thread, RLock, current_thread
 from time import sleep
 import signal
+import logging
 
 # A Plot is an object-oriented realization of the information Arrangement
 # object contains. We don't force the block developer to handle this complexity.
@@ -108,9 +109,12 @@ class Grid(object):
         if not self._done.is_set():
             self._done.set()
             self._refresh.set() # in order to release it from a wait()
-            if self._thread and self._thread.isAlive():
+
+            if (self._thread and self._thread.isAlive() and
+                self._thread.name != current_thread().name):
                 self._thread.join()
-            if self._input and self._input.isAlive():
+            if (self._input and self._input.isAlive() and
+                self._input.name != current_thread().name):
                 self._input.join()
 
     def done(self):
@@ -119,23 +123,31 @@ class Grid(object):
     def _run(self):
         self._refresh.set() # show at start once without an event triggering
         with self._term.fullscreen():
-            while True:
-                if self._done.is_set():
-                    break
-                if not self._refresh.wait(.5):
-                    continue
-                with self._lock:
-                    if self._not_just_dirty.is_set():
-                        just_dirty = False
-                        self._not_just_dirty.clear()
-                    else:
-                        just_dirty = True
-                    self.load(self._block.arrangement)
-                    self.display_plot(self._root_plot,
-                                      0, 0,                                   # x, y
-                                      self._term.width, self._term.height-1,  # w, h
-                                      self._term, just_dirty)
-                    self._refresh.clear()
+            try:
+                while True:
+                    if self._done.is_set():
+                        break
+                    if not self._refresh.wait(.5):
+                        continue
+                    with self._lock:
+                        if self._not_just_dirty.is_set():
+                            just_dirty = False
+                            self._not_just_dirty.clear()
+                        else:
+                            just_dirty = True
+                        self.load(self._block.arrangement)
+                        self.display_plot(self._root_plot,
+                                          0, 0,                                   # x, y
+                                          self._term.width, self._term.height-1,  # w, h
+                                          self._term, just_dirty)
+                        self._refresh.clear()
+            except Exception as e:
+                debug = True
+                if debug:
+                    logging.exception("30 seconds to view exception")
+                    sleep(30)
+                self.stop()
+                # TODO. This doesn't successfully stop the application
 
     def update(self):
         self._refresh.set()
