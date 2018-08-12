@@ -2,8 +2,8 @@
 import os, sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "blessedblocks"))
 # Previous two lines not needed if blessedblocks modules is installed
-from blessedblocks.block import Block, Arrangement, SizePref
-from blessedblocks.grid import Grid
+from blessedblocks.block import Block, Grid, SizePref
+from blessedblocks.runner import Runner
 from threading import Event, Thread, Lock
 from tabulate import tabulate
 import datetime
@@ -23,9 +23,9 @@ FILLER = ('01234}6789012345678901234567890123456789\n'
 
 # Specify the positioning of the blocks.
 # A list is horizontal, a tuple is vertical
-arrangement = [(4, [(1,2,3), (8,9), (5,[6,7])])]
+grid = [(4, [(1,2,3), (8,9), (5,[6,7])])]
 
-# Build the contents of each of the blocks specified in the arrangement
+# Build the contents of each of the blocks specified in the grid
 blocks = {}
 
 blocks[1] = Block('Block1') # all the defaults
@@ -85,31 +85,31 @@ blocks[8] = Block('Block8', # text in center of block
 blocks[8].update(tabulate(table, headers=headers))
 
 
-# Create an embedded block with its own arrangement
+# Create an embedded block with its own grid
 eblocks = {}
 eblocks[1] = Block('eblock1', title='eblock1')
 eblocks[2] = Block('eblock2', title='eblock2')
 eblocks[1].update("some text")
 eblocks[2].update("more text")
 
-ea = Arrangement(layout=[(1,2)], blocks=eblocks)
-bb = Block("embedded", arrangement=ea)
+eg = Grid(layout=[(1,2)], blocks=eblocks)
+bb = Block("embedded", grid=eg)
 
 blocks[9] = bb  # stick it in slot 9
 
-a = Arrangement(layout=arrangement, blocks=blocks)
-ba = Block("", arrangement=a)
+g = Grid(layout=grid, blocks=blocks)
+ba = Block("", grid=g)
 
 # Main logic
 stop_event = Event()
-g = Grid(ba, stop_event=stop_event)
+r = Runner(ba, stop_event=stop_event)
 
-g.start()
+r.start()
 
 for i in range(300):
-    if g.app_refresh_event.is_set():
+    if r.app_refresh_event.is_set():
         blocks[2].title = 'got event ' + str(i)
-        g.app_refresh_event.clear()
+        r.app_refresh_event.clear()
     stop_event.wait(.1)
     blocks[2].top_border = str(i%10)
     import random
@@ -117,14 +117,14 @@ for i in range(300):
     blocks[4].update(str(datetime.datetime.now()))
     eblocks[1].update(str(i))
 
-# Replace the entire arrangement
-a2 = Arrangement(layout=[2,3,4,9], blocks=blocks)
-g.load(a2)
+# Replace the entire grid
+g2 = Grid(layout=[2,3,4,9], blocks=blocks)
+r.load(g2)
 
 for i in range(300):
     stop_event.wait(.1)
     blocks[4].update(str(datetime.datetime.now()))
 
-g.stop()
+r.stop()
 
 

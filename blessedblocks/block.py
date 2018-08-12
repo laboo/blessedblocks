@@ -3,13 +3,33 @@ from threading import RLock
 from collections import namedtuple
 import re
 
+'''
+A Block represents a rectangular section of a terminal screen. A Block can contain
+other Blocks by specifying a Grid, or it can generate display text, but it can't
+do both. Thus, Blocks are nodes in a tree, and only terminal nodes can be displayed.
+
+A Grid specifies how its Block is broken up into rectangular slots, each of which
+can hold one other Block, and then assigns a Block to the each of the slots.
+
+A SizePref if a declaration of the Block's demands and requests when placed into a
+Grid with other Blocks.
+
+Blocks (mutable) and SizePrefs (immutable) are thread-safe, Grids are not.
+Grid modifications should be done by replacing a Grid with another.
+
+A Runner (defined in runner.y) is responsible for displaying a Block,
+and all the Blocks it contains, recursively, in the terminal. The Runner displays the
+Block when started, and again every time any Block changes, or a periodic timer expires.
+
+'''
+
 SizePref = namedtuple('SizePref', 'hard_min hard_max')
 
-class Arrangement(object):
+class Grid(object):
 
     def __init__(self, layout=None, blocks=None):
         if (layout or blocks) and not (layout and blocks):
-            raise ValueError('Arrangement arguments must both exist or both not exist.')
+            raise ValueError('Grid arguments must both exist or both not exist.')
         self._slots = {}
         self._layout = layout if layout else []
         self._index = 0
@@ -19,15 +39,15 @@ class Arrangement(object):
         for element in layout:
             if type(element) == int:
                 if element in self._slots:
-                    raise ValueError('numbers embedded in arrangement must not have duplicates')
+                    raise ValueError('numbers embedded in grid must not have duplicates')
                 self._index = max(self._index, element) + 1
                 self._slots[element] = blocks[element] if blocks and element in blocks else None
             elif type(element) in (list, tuple):
                 if len(element) == 0:
-                    raise ValueError('lists and tuples embedded in arrangement must not be empty')
+                    raise ValueError('lists and tuples embedded in grid must not be empty')
                 self._load(element, blocks)
             else:
-                raise ValueError('arrangement must contain only list of numbers and tuples of numbers')
+                raise ValueError('grid must contain only list of numbers and tuples of numbers')
 
     def add_under(self, block):
         i = self._index
@@ -51,6 +71,11 @@ class Arrangement(object):
     def __repr__(self):
         return str(self._layout)
 
+'''
+These two wrappers add convenience for keeping the Block thread-safe.
+The safe_set function notifies the Grid, if the block is contained
+within one, that the block has changed.
+'''
 from functools import wraps
 def safe_set(method):
     @wraps(method)
@@ -58,7 +83,8 @@ def safe_set(method):
         with self.write_lock:
             method(self, *args, **kwargs)
         try:
-            self.dirty_event.set()
+            if self.dirty_event:
+                self.dirty_event.set()
         except AttributeError:
             pass
     return _impl
@@ -87,7 +113,7 @@ class Block(object):
                  # as-much-as-you-got-but-none-is-fine.
                  w_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
                  h_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
-                 arrangement=None):
+                 grid=None):
         self.name = name
         self.title = title
         self.top_border = top_border
@@ -99,7 +125,7 @@ class Block(object):
         self.text = None
         self.w_sizepref = w_sizepref
         self.h_sizepref = h_sizepref
-        self.arrangement = arrangement
+        self.grid = grid
         # Below here non-thread safe attrs
         self.text_rows = 0
         self.text_cols = 0
@@ -364,23 +390,23 @@ class Block(object):
 
     @property
     @safe_get
-    def arrangement(self): return self._arrangement
+    def grid(self): return self._grid
 
-    @arrangement.setter
+    @grid.setter
     @safe_set
-    def arrangement(self, val): self._arrangement = val
+    def grid(self, val): self._grid = val
 
 def main():
     blocks = [Block('b1'), Block('b2'), Block('b3')]
     layout = [(0,1), 2]
-    arr = Arrangement(layout,blocks)
-    print(arr)
-    arr.add_right(Block('b4'))
-    print(arr)
-    arr.add_under(Block('b5'))
-    print(arr)
-    b1 = Block("hi", arrangement=arr)
-    print(b1.arrangement)
+    g = Grid(layout, blocks)
+    print(g)
+    g.add_right(Block('b4'))
+    print(g)
+    g.add_under(Block('b5'))
+    print(g)
+    b1 = Block("hi", grid=g)
+    print(b1.grid)
     exit()
     import sys
     from blessed import Terminal

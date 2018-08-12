@@ -1,6 +1,6 @@
 from __future__ import print_function
 from blessed import Terminal
-from .block import Block, Arrangement, SizePref
+from .block import Block, Grid, SizePref
 from .cmd import get_cmd
 from math import floor, ceil
 from threading import Event, Thread, RLock, current_thread
@@ -8,29 +8,31 @@ from time import sleep
 import signal
 import logging
 
-# A Plot is an object-oriented realization of the information Arrangement
-# object contains. We don't force the block developer to handle this complexity.
-# The block developer is responsible only for the Arrangement: a map of numbers
-# to blocks, and a layout. The layout is an recursive structure containing only
+# A Plot is an object-oriented realization of the information the Grid object
+# inside the Runner's Block object (attribute).  We don't force the Block
+# developer to handle this complexity.
+# The Block developer is responsible only for the Grid: a map of numbers
+# to blocks, and a layout. The layout is a recursive structure containing only
 # Python lists, tuples, and numbers. (for example [1, [(2,3), [4, 5]]]). The
-# digits signify leaf blocks (those not containing an Arrangement of blocks
-# embedded with it. Lists in the layout signify horizontal orientation of the
-# blocks it contains, and the tuple, horizontal orientation. The problem with
-# the layout is that it's not possible (without subclassing, which doesn't work
+# digits signify leaf blocks (those not containing a Grid of blocks
+# embedded within it. Lists inside the layout signify horizontal orientation of the
+# blocks it contains, and tuples, horizontal orientation. The problem with
+# this simple implementation of a layout -- just lists, tuple, and digits --
+# is that it's not possible (without subclassing, which doesn't work
 # well here) to hang metadata on the lists and tuples. We need that metadata to
-# know how to divvy up the space available to leaf blocks in the list or tuple,
-# given the space available to the list or tuple as a whole. This metadata is the
-# SizePrefs each block declares.
+# know how to divvy up the space available to each of the leaf blocks within
+# the list or tuple, given the space available to the list or tuple as a whole.
+# This metadata is the SizePrefs each Block declares.
 #
-# We use Plots to objectify the Arrangement as follows. A leaf block gets wrapped
+# We use Plots to objectify the Grid as follows. A leaf Block gets wrapped
 # in Plot object together with the block's own SizePrefs. A list or tuple in a
-# layout is  built into a Plot object using the blocks it contains, but its
-# SizePref's arg calculated from the merging of the SizePrefs of those blocks.
+# layout is  built into a Plot object using the Blocks it contains, but its
+# SizePref's arg is calculated from the merging of the SizePrefs of those blocks.
 # This is the metadata referred to above.
 
 # So, building a plot requires a recursive procedure. On the way down from the
 # outermost block, we build up a tree of Plots as we go. It's *on the way back up*,
-# though, that we calcuate SizePrefs for the Plots that represent sequences.
+# though, that we calcuate SizePrefs for the Plots that represent lists or tuples.
 
 class Plot(object):
     def __init__(self,
@@ -55,7 +57,7 @@ class Plot(object):
         me = me + ' ]'
         return me
 
-class Grid(object):
+class Runner(object):
     def __init__(self, block, stop_event=None):
         self._block = block
         self._plot = Plot()
@@ -67,10 +69,10 @@ class Grid(object):
         self._stop_event = stop_event
         self._not_just_dirty = Event()
         self._root_plot = None
-        self.load(self._block.arrangement)
+        self.load(self._block.grid)
 
     def __repr__(self):
-        return 'grid'
+        return 'runner'
 
     def _on_kill(self, *args):
         if self._stop_event:
@@ -87,7 +89,7 @@ class Grid(object):
     def start(self):
 
         self._thread = Thread(
-            name='grid',
+            name='runner',
             target=self._run,
             args=()
         )
@@ -135,7 +137,7 @@ class Grid(object):
                             self._not_just_dirty.clear()
                         else:
                             just_dirty = True
-                        self.load(self._block.arrangement)
+                        self.load(self._block.grid)
                         self.display_plot(self._root_plot,
                                           0, 0,                                   # x, y
                                           self._term.width, self._term.height-1,  # w, h
@@ -154,17 +156,17 @@ class Grid(object):
 
     def update_block(self, index, block):
         with self._lock:
-            self._block.arrangement._slots[index] = block
+            self._block.grid._slots[index] = block
             block.set_dirty_event(self._refresh)
         self.update()
 
-    def load(self, arrangement):
+    def load(self, grid):
         with self._lock:
-            self._block.arrangement = arrangement
-            for _, block in self._block.arrangement._slots.items():
+            self._block.grid = grid
+            for _, block in self._block.grid._slots.items():
                 block.set_dirty_event(self._refresh)
-            layout = self._block.arrangement._layout
-            blocks = self._block.arrangement._slots
+            layout = self._block.grid._layout
+            blocks = self._block.grid._slots
             self._root_plot = self.build_plot(layout, blocks)
         #self.update_all()
 
@@ -177,14 +179,14 @@ class Grid(object):
                 if not cmd:
                     self.update()
 
-    # Gets called at Grid creation any time the configuration (not display)
-    # of a block in the Grid gets changes. When it does, we need to rebuild
-    # the plot tree. Starting from the root block, we recurse down all its
-    # embedded blocks, creating a Plot to represent each level on the way.
+    # Gets called at Runner creation and at any time the Runner's Block
+    # changes. When it does, we need to rebuild the plot tree. Starting
+    # from the root Block, we recurse down all its embedded Blocks, creating
+    # a Plot to represent each level on the way.
     # As we undo the recursion and travel back up the tree, at each level
     # we merge the SizePrefs of all the blocks at that level and store the
     # result in the Plot containing the blocks. When this completes, we can use the
-    # resulting plot tree to display the Grid.
+    # resulting plot tree to display the Runner's Block.
     def build_plot(self, layout, blocks, horizontal=True):
         def merge_sizeprefs(plots):
             w_hard_min, w_hard_max, h_hard_min, h_hard_max = 0, [], 0, []
@@ -208,7 +210,7 @@ class Grid(object):
         subplots = []
         if not layout:
             for _, block in blocks.items():
-                # if there's no arrangement there's only one block.
+                # if there's no grid there's only one block.
                 # merge its sizeprefs (which contain numbers) into
                 # new sizeprefs containing lists.
                 hard_max = []
@@ -232,9 +234,9 @@ class Grid(object):
         for element in layout:
             if type(element) == int:
                 block = blocks[element]
-                if block.arrangement:
-                    subplot = self.build_plot(block.arrangement._layout,
-                                              block.arrangement._slots)
+                if block.grid:
+                    subplot = self.build_plot(block.grid._layout,
+                                              block.grid._slots)
                 else:  # it's a leaf block
                     subplot = self.build_plot(None, {element: block})
             else:  # it's list or tuple
@@ -361,9 +363,9 @@ if __name__ == '__main__':
     blocks[1] = Block('blx')
     blocks[2] = Block('bly')
     blocks[3] = Block('blz')
-    a = Arrangement([1, (2,3)], blocks)
-    top = Block('top', arrangement=a)
-    grid = Grid(top)
-    plot = grid.build_plot(a._layout, a._slots)
+    g = Grid([1, (2,3)], blocks)
+    top = Block('top', grid=g)
+    runner = Runner(top)
+    plot = runner.build_plot(a._layout, a._slots)
     print(plot)
 
