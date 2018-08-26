@@ -82,6 +82,7 @@ class BareBlock(Block):
                             print(text.format(t=term), end='')
                         except ValueError:
                             raise ValueError(line.rstrip())
+                term.move(term.height, term.width)  # TODO This doesn't work
             else:
                 return [line.display for line in out]  # for testing purposes only
 

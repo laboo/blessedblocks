@@ -17,7 +17,7 @@ blocks = {}
 blocks[0] = BareBlock()
 blocks[0].update(" ")
 blocks[1] = BareBlock(vjust='^', hjust='^')
-blocks[1].update("My Title!\n--------------")
+blocks[1].update("{t.red}My {t.white}American {t.blue}Title!\n{t.normal}------------------")
 blocks[2] = BareBlock(hjust='<')
 blocks[2].update((('x' * 50) + '\n') * 15 + 'x')
 blocks[3] = BareBlock(vjust='=', hjust='^')
