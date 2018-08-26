@@ -47,7 +47,7 @@ class BareBlock(Block):
                 # Here we move some of them up above the text if we need to.
                 ver_pad_count = top_ver_pad
                 while ver_pad_count and remaining_rows:
-                    line = Line(' ' * width, width, '<')
+                    line = Line(' ' * width, width, self.hjust)
                     out.append(line)
                     ver_pad_count -= 1
                     remaining_rows -= 1
@@ -59,9 +59,9 @@ class BareBlock(Block):
                         break
                     line = None
                     if i >= len(useable_btext_rows):
-                        line = Line(prev_seq + ' ', width, '<')
+                        line = Line(prev_seq + ' ', width, self.hjust)
                     else:
-                        line = Line(prev_seq + useable_btext_rows[i], width, '<')
+                        line = Line(prev_seq + useable_btext_rows[i], width, self.hjust)
                     if line:
                         out.append(line)
                         prev_seq = line.last_seq

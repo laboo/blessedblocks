@@ -23,7 +23,7 @@ blocks[2].update((('x' * 50) + '\n') * 15 + 'x')
 blocks[3] = BareBlock(vjust='=', hjust='^')
 blocks[3].update('This is some centered text!')
 blocks[4] = BareBlock(hjust='>')
-blocks[4].update('x\n' * 20 + 'x')
+blocks[4].update((('x' * 50) + '\n') * 15 + 'x')
 blocks[5] = BareBlock()
 blocks[5].update((('z' * 200) + '\n') * 15 + 'x')
 
