@@ -1,7 +1,60 @@
 import pytest
-
 from blessedblocks.line import Line
+from blessed import Terminal
 
+term = Terminal()
+
+
+def test_parse_dups():
+    line = Line('{t.green}xy{t.green}z', 3, '^')
+    print(('\n' + line.display + '{t.normal}').format(t=term))
+    assert line.markup == '{t.green}xyz'
+    assert line.plain == 'xyz'
+    assert line.last_seq == '{t.green}'
+
+def test_parse_contig():
+    line = Line('{t.green}{t.blue}xyz', 3, '^')
+    print(('\n' + line.display + '{t.normal}').format(t=term))
+    assert line.markup == '{t.blue}xyz'
+    assert line.plain == 'xyz'
+    assert line.last_seq == '{t.blue}'
+
+def test_parse_contig_3():
+    line = Line('{t.green}{t.blue}{t.red}xyz', 3, '^')
+    print(('\n' + line.display + '{t.normal}').format(t=term))
+    assert line.markup == '{t.red}xyz'
+    assert line.plain == 'xyz'
+    assert line.last_seq == '{t.red}'
+    
+def test_width_just_center():
+    line = Line('{t.green}xy{t.blue}z', 12, '^')
+    left_just, right_just = 4*' ', 5*' '
+    print(('\n' + line.display + '{t.normal}').format(t=term))
+    assert line.markup == left_just + '{t.green}xy{t.blue}z' + right_just
+    assert line.plain == left_just + 'xyz' + right_just
+
+def test_width_just_left():
+    line = Line('{t.green}xy{t.blue}z', 12, '<')
+    left_just, right_just = '', 9*' '
+    print(('\n' + line.display + '{t.normal}').format(t=term))
+    assert line.markup == left_just + '{t.green}xy{t.blue}z' + right_just
+    assert line.plain == left_just + 'xyz' + right_just
+
+def test_width_just_right():
+    line = Line('{t.green}xy{t.blue}z', 12, '>')
+    left_just, right_just = 9*' ', ''
+    print(('\n' + line.display + '{t.normal}').format(t=term))
+    assert line.markup == left_just + '{t.green}xy{t.blue}z' + right_just
+    assert line.plain == left_just + 'xyz' + right_just
+
+def test_blank_line():
+    line = Line('', 12, ',')
+    left_just, right_just = '', 12*' '
+    print(('\n' + line.display + '{t.normal}').format(t=term))
+    assert line.markup == right_just
+    assert line.plain == right_just
+    
+''' TODO convert these
 def test_simple():
     line = Line('simple line of text')
     assert line.plain == 'simple line of text'
@@ -73,3 +126,4 @@ def test_last_sequence_normal():
     assert line.markup == text
     assert line.display == text  # already ends in normal
     assert line.last_seq == '{t.normal}'
+'''

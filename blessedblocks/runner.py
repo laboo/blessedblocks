@@ -1,7 +1,6 @@
 from __future__ import print_function
 from blessed import Terminal
 from .block import Block, Grid, SizePref
-from .cmd import get_cmd
 from math import floor, ceil
 from threading import Event, Thread, RLock, current_thread
 from time import sleep
@@ -94,16 +93,9 @@ class Runner(object):
             args=()
         )
 
-        self._input = Thread(
-            name='input',
-            target=self._input,
-            args=()
-        )
-
         signal.signal(signal.SIGWINCH, self._on_resize)
         signal.signal(signal.SIGINT, self._on_kill)
 
-        self._input.start()
         self._thread.start()
 
     def stop(self, *args):
@@ -115,9 +107,6 @@ class Runner(object):
             if (self._thread and self._thread.isAlive() and
                 self._thread.name != current_thread().name):
                 self._thread.join()
-            if (self._input and self._input.isAlive() and
-                self._input.name != current_thread().name):
-                self._input.join()
 
     def done(self):
         return not self._thread.isAlive() or self._done.is_set()
@@ -133,15 +122,15 @@ class Runner(object):
                         continue
                     with self._lock:
                         if self._not_just_dirty.is_set():
-                            just_dirty = False
+                            #just_dirty = False
                             self._not_just_dirty.clear()
-                        else:
-                            just_dirty = True
+                        #else:
+                            #just_dirty = True
                         self.load(self._block.grid)
                         self.display_plot(self._root_plot,
                                           0, 0,                                   # x, y
-                                          self._term.width, self._term.height-1,  # w, h
-                                          self._term, just_dirty)
+                                          self._term.width, self._term.height,  # w, h
+                                          self._term)
                         self._refresh.clear()
             except Exception as e:
                 debug = True
@@ -157,27 +146,19 @@ class Runner(object):
     def update_block(self, index, block):
         with self._lock:
             self._block.grid._slots[index] = block
-            block.set_dirty_event(self._refresh)
+            block.dirty_event = self._refresh
         self.update()
 
     def load(self, grid):
         with self._lock:
             self._block.grid = grid
             for _, block in self._block.grid._slots.items():
-                block.set_dirty_event(self._refresh)
+                block.dirty_event = self._refresh
             layout = self._block.grid._layout
             blocks = self._block.grid._slots
             self._root_plot = self.build_plot(layout, blocks)
         #self.update_all()
 
-    def _input(self):
-        with self._term.fullscreen():
-            while True:
-                if self._done.is_set():
-                    break
-                cmd = get_cmd(self._term, self._lock, self._done, self.app_refresh_event)
-                if not cmd:
-                    self.update()
 
     # Gets called at Runner creation and at any time the Runner's Block
     # changes. When it does, we need to rebuild the plot tree. Starting
@@ -252,7 +233,7 @@ class Runner(object):
     # each plot by using the SizePrefs of the plots
     def display_plot(self, plot, x, y, w, h, term=None, just_dirty=True):
         if plot.block:
-            plot.block.display(w, h, x, y, term, just_dirty)
+            plot.block.display(w, h, x, y, term)
         else:
             for subplot, new_x, new_y, new_w, new_h in self.divvy(plot.subplots, x, y, w, h, plot.horizontal):
                 self.display_plot(subplot, new_x, new_y, new_w, new_h, term, just_dirty)

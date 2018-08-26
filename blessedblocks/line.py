@@ -1,4 +1,5 @@
 from blessed import Terminal
+from math import floor, ceil
 from collections import defaultdict
 import re
 
@@ -13,7 +14,7 @@ class Line():
     shows the plain text with colors, and (3) markup, which the text with
     color tags, but not necessarily fit for printing.
     '''
-    def __init__(self, blessed_text):
+    def __init__(self, blessed_text, width, just):
         '''Create a Line object
 
         Args:
@@ -24,7 +25,7 @@ class Line():
         '''
         self._full = blessed_text
         self._text, self._seqs, self.last_seq = self._parse(blessed_text)
-        self._build(0, len(self._text))
+        self._build(0, width, just)
 
     def __len__(self):
         '''Returns:
@@ -34,24 +35,31 @@ class Line():
 
     def __repr__(self):
         return self.plain  # TODO what should this be?
-    
+
     def _parse(self, full):
         seqs = defaultdict(list)
         text = ''
         loc = 0
         prev_end = 0
         prev_seq = None
+        prev_loc = None
         if full:
             for match in re.finditer(r'{t\..+?}', full):
                 loc += match.start() - prev_end
                 curr_seq = full[match.start():match.end()]
                 t = full[prev_end:match.start()] # text before/after/between sequences
                 text += t
-                if curr_seq != prev_seq:
-                    seqs[loc] = curr_seq
+                if not prev_seq:
+                    seqs[loc] = curr_seq  # always keep the first seq
+                    prev_loc = loc
+                else:
+                    if prev_end == match.start(): # drop the first of two
+                        seqs[prev_loc] = curr_seq
+                    elif curr_seq != prev_seq:
+                        seqs[loc] = curr_seq
+                        prev_loc = loc
                 prev_seq = curr_seq
                 prev_end = match.end()
-            #self.last_seq = prev_seq
             text += full[prev_end:]
         return text, seqs, prev_seq
 
@@ -63,13 +71,22 @@ class Line():
             out.append(c)
         return ''.join(out)
 
-    def _build(self, begin, end):
+    def _calc_just(self, just, extra):
+        if just == '<':
+            return '', ' ' * extra
+        elif just == '>':
+            return ' ' * extra, ''
+        else:  # ^
+            return (' ' * floor(extra/2),
+                    ' ' * ceil(extra/2))
+
+    def _build(self, begin, width, just):
         plain = ''
         markup = ''
         display = ''
         last_seq = ''
         start = min(0,begin)
-        stop = min(end,len(self._text))
+        stop = min(width,len(self._text))
         for i in range(start, stop):
             if i in self._seqs:
                 markup += self._seqs[i]
@@ -79,43 +96,29 @@ class Line():
             plain += c
             markup += c
             display += self._escape_brackets(c)
-        # handle trailing sequences by grabbing just the last one of
-        # any past the end
-        i = stop  # where it would have exited the loop if it entered
-        j = len(self._full) if self._full else 0
-        while j >= i:
-            if j in self._seqs:
-                markup += self._seqs[j]
-                display += self._seqs[j]
-                last_seq = self._seqs[j]
-                # if there are multiple tags passed the last text char,
-                # only the last one is relevant, so we break after finding one
-                break
-            j -= 1
-        if last_seq and last_seq != self.last_seq:
-            display += self.last_seq
-            last_seq = self.last_seq
-        display += '{t.normal}' if not last_seq or last_seq != '{t.normal}' else ''
-        self.plain = plain
-        self.markup = markup
-        self.display = display
 
-    def resize(self, begin, end):
-        self._build(begin, end)
+        left_pad = right_pad = ''
+        if width > stop:
+            left_pad, right_pad = self._calc_just(just, width - stop)
+        self.plain = left_pad + plain + right_pad
+        self.markup = left_pad + markup + right_pad
+        self.display = left_pad + display + right_pad
+
+    def resize(self, begin, width, just):
+        self._build(begin, width, just)
 
 if __name__ == '__main__':
     term = Terminal()
-    line = Line("{t.green}{}{}}{blac{t.yellow}k justp{t.cyan}laintext{t.pink}")
+    just = '^'
+    line = Line("{t.green}{}{}}{blac{t.yellow}k justp{t.cyan}laintext{t.pink}", 15, just)
     for i in range(len(line.plain) + 2):
-        line.resize(0,i)
+        line.resize(0,i,just)
         print(line.plain)
         print(line.display.format(t=term) + '*')
 
-    line.resize(0,len(line.plain))
+    line.resize(0,len(line.plain), just)
     print(line._full)
     print(line.plain)
     print(line.markup)
     print(line.display)
     print(line.display.format(t=term) + '*')
-
-
