@@ -3,6 +3,7 @@ import os, sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "blessedblocks"))
 # Previous two lines not needed if blessedblocks modules is installed
 from blessedblocks.block import Block, Grid, SizePref
+from blessedblocks.line import Line
 from blessedblocks.runner import Runner
 from threading import Event, Thread, Lock
 from tabulate import tabulate
@@ -29,7 +30,8 @@ grid = [(4, [(1,2,3), (8,9), (5,[6,7])])]
 blocks = {}
 
 blocks[1] = Block('Block1') # all the defaults
-blocks[1].update("{t.normal}A block with no title\n" + FILLER)
+blocks[1].update("{t.normal}A block with no title\n" +
+                 Line.repeat_to_width('{t.red}-{t.white}-{t.blue}-')
 
 blocks[2] = Block('Block with colors in title.',
                   title='{t.cyan}Block {t.red}#2{t.normal}',

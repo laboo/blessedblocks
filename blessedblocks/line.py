@@ -2,6 +2,7 @@ from blessed import Terminal
 from math import floor, ceil
 from collections import defaultdict
 import re
+import math
 
 # Not thread-safe
 class Line():
@@ -24,7 +25,7 @@ class Line():
             nothing, but the plain, display and markup attributes are made available.
         '''
         self._full = blessed_text
-        self._text, self._seqs, self.last_seq = self._parse(blessed_text)
+        self._text, self._seqs, self.last_seq = Line.parse(blessed_text)
         self._build(0, width, just)
 
     def __len__(self):
@@ -36,7 +37,7 @@ class Line():
     def __repr__(self):
         return self.plain  # TODO what should this be?
 
-    def _parse(self, full):
+    def parse(full):
         seqs = defaultdict(list)
         text = ''
         loc = 0
@@ -106,6 +107,21 @@ class Line():
 
     def resize(self, begin, width, just):
         self._build(begin, width, just)
+
+    def repeat_to_width(blessed_text, width):
+        text, seqs, last_seq = Line.parse(blessed_text)
+        line = []
+        for i in range(width):
+            j = i % len(text)
+            if j == 0:
+                if j in seqs:
+                    line.append(seqs[j])
+                else:
+                    line.append('{t.normal}')
+            elif j in seqs:
+                line.append(seqs[j])
+            line.append(text[j])
+        return Line(''.join(line), width, '^')
 
 if __name__ == '__main__':
     term = Terminal()

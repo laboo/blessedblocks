@@ -27,47 +27,55 @@ Block when started, and again every time any Block changes, or a periodic timer 
 SizePref = namedtuple('SizePref', 'hard_min hard_max')
 
 class Grid(object):
-
     def __init__(self, layout=None, blocks=None):
         if (layout or blocks) and not (layout and blocks):
             raise ValueError('Grid arguments must both exist or both not exist.')
+        self.write_lock = RLock()
         self._slots = {}
         self._layout = layout if layout else []
         self._index = 0
         self._load(self._layout, blocks)
 
     def _load(self, layout, blocks=None):
-        for element in layout:
-            if type(element) == int:
-                if element in self._slots:
-                    raise ValueError('numbers embedded in grid must not have duplicates')
-                self._index = max(self._index, element) + 1
-                self._slots[element] = blocks[element] if blocks and element in blocks else None
-            elif type(element) in (list, tuple):
-                if len(element) == 0:
-                    raise ValueError('lists and tuples embedded in grid must not be empty')
-                self._load(element, blocks)
-            else:
-                raise ValueError('grid must contain only list of numbers and tuples of numbers')
+        with self.write_lock:
+            for element in layout:
+                if type(element) == int:
+                    if element in self._slots:
+                        raise ValueError('numbers embedded in grid must not have duplicates')
+                    self._index = max(self._index, element) + 1
+                    self._slots[element] = blocks[element] if blocks and element in blocks else None
+                elif type(element) in (list, tuple):
+                    if len(element) == 0:
+                        raise ValueError('lists and tuples embedded in grid must not be empty')
+                    self._load(element, blocks)
+                else:
+                    raise ValueError('grid must contain only list of numbers and tuples of numbers')
+
+    def replace(self, i, block):
+        with self.write_lock:
+            slots[i] = block
 
     def add_under(self, block):
-        i = self._index
-        if type(self._layout) == list:
-            self._layout = tuple([self._layout, i])
-        elif type(self._layout) == tuple:
-            self._layout = self._layout.append(i)
-        else:
-            raise ValueError(type(self._layout))
-        self._index += 1
+        with self.write_lock:
+            i = self._index
+            if type(self._layout) == list:
+                self._layout = tuple([self._layout, i])
+            elif type(self._layout) == tuple:
+                self._layout = self._layout.append(i)
+            else:
+                raise ValueError(type(self._layout))
+            self._index += 1
+
     def add_right(self, block):
-        i = self._index
-        if type(self._layout) == list:
-            self._layout.append(i)
-        elif type(self._layout) == tuple:
-            self._layout = [self._layout, i]
-        else:
-            raise ValueError(type(self._layout))
-        self._index += 1
+        with self.write_lock:
+            i = self._index
+            if type(self._layout) == list:
+                self._layout.append(i)
+            elif type(self._layout) == tuple:
+                self._layout = [self._layout, i]
+            else:
+                raise ValueError(type(self._layout))
+            self._index += 1
 
     def __repr__(self):
         return str(self._layout)
@@ -100,8 +108,9 @@ def safe_get(method):
 
 class Block(object, metaclass=abc.ABCMeta):
     #MIDDLE_DOT = u'\u00b7'
-    write_lock = RLock()
+
     def __init__(self,
+                 text=' ',
                  hjust='<',  # horizontally left-justified within block
                  vjust='^',  # vertically centered within block
                  # The SizePrefs indicate how much screen real estate (width and height) this
@@ -110,9 +119,10 @@ class Block(object, metaclass=abc.ABCMeta):
                  w_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
                  h_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
                  grid=None):
+        self.write_lock = RLock()
         self.hjust = hjust
         self.vjust = vjust
-        self.text = None
+        self.text = text if text else ' '
         self.w_sizepref = w_sizepref
         self.h_sizepref = h_sizepref
         self.grid = grid
@@ -131,26 +141,32 @@ class Block(object, metaclass=abc.ABCMeta):
                         len(self.text.split('\n')) if self.text else 0))
     '''
 
-    #TODO make thread-safe
-    #def set_dirty_event(self, event):
-    #    self.dirty_event = event
-
-    def update(self, text):
-        with Block.write_lock:
-            if self.text != text:
-                self.text = text
-                rows = text.split('\n')
-                clean_rows = []
-                for row in rows:
-                    clean_rows.append(re.sub(r'{t\..*?}', '', row))
-                self._num_text_cols = max(map(len, clean_rows))
-                self._num_text_rows = len(clean_rows)
-                if self.dirty_event:
-                    self.dirty_event.set()
-
     @abc.abstractmethod
     def display(self, width, height, x, y, term=None):
         raise NotImplementedError('Subclasses must define display() in order to use this base class.')
+
+    @property
+    @safe_get
+    def text(self): return self._text
+
+    @text.setter
+    @safe_set
+    def text(self, val):
+        if val and (not hasattr(self, '_text') or self._text != val):
+            self._text = val
+            rows = val.split('\n')
+            clean_rows = []
+            for row in rows:
+                clean_rows.append(re.sub(r'{t\..*?}', '', row))
+            self._num_text_cols = max(map(len, clean_rows))
+            self._num_text_rows = len(clean_rows)
+            try:
+                if self.dirty_event:
+                    self.dirty_event.set()
+            except AttributeError:
+                pass
+        else:
+            self._text = ''
 
     @property
     @safe_get
@@ -192,11 +208,12 @@ class Block(object, metaclass=abc.ABCMeta):
 
     @property
     @safe_get
-    def v_sizepref(self): return self._v_sizepref
+    def w_sizepref(self): return self._w_sizepref
 
-    @v_sizepref.setter
+    @w_sizepref.setter
     @safe_set
-    def v_sizepref(self, val): self._v_sizepref = val
+    def w_sizepref(self, val):
+        self._w_sizepref = val
 
     @property
     @safe_get

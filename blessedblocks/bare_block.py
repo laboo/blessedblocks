@@ -4,6 +4,7 @@ import re
 
 class BareBlock(Block):
     def __init__(self,
+                 text=None,
                  hjust='<',  # horizontally left-justified within block
                  vjust='^',  # vertically centered within block
                  # The SizePrefs indicate how much screen real estate (width and height) this
@@ -12,12 +13,12 @@ class BareBlock(Block):
                  w_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
                  h_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
                  grid=None):
-        super().__init__(hjust, vjust, w_sizepref, h_sizepref, grid)
+        super().__init__(text=text, hjust=hjust, vjust=vjust,
+                         w_sizepref=w_sizepref, h_sizepref=h_sizepref, grid=grid)
         self._prev_seq = '{t.normal}'
 
     def display(self, width, height, x, y, term=None):
-        with Block.write_lock:
-
+        with self.write_lock:
             out = []
             if self.text is not None and len(self.text) != 0:
                 available_for_text_rows = max(0, height)

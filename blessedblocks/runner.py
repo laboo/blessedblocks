@@ -14,8 +14,8 @@ import logging
 # to blocks, and a layout. The layout is a recursive structure containing only
 # Python lists, tuples, and numbers. (for example [1, [(2,3), [4, 5]]]). The
 # digits signify leaf blocks (those not containing a Grid of blocks
-# embedded within it. Lists inside the layout signify horizontal orientation of the
-# blocks it contains, and tuples, horizontal orientation. The problem with
+# embedded within it). _Lists_ inside the layout signify horizontal orientation
+# of the blocks it contains, and _tuples_, horizontal orientation. The problem with
 # this simple implementation of a layout -- just lists, tuple, and digits --
 # is that it's not possible (without subclassing, which doesn't work
 # well here) to hang metadata on the lists and tuples. We need that metadata to
@@ -24,13 +24,13 @@ import logging
 # This metadata is the SizePrefs each Block declares.
 #
 # We use Plots to objectify the Grid as follows. A leaf Block gets wrapped
-# in Plot object together with the block's own SizePrefs. A list or tuple in a
-# layout is  built into a Plot object using the Blocks it contains, but its
+# in a Plot object together with the block's own SizePrefs. A list or tuple in a
+# layout is built into a Plot object using the Blocks it contains, but its
 # SizePref's arg is calculated from the merging of the SizePrefs of those blocks.
 # This is the metadata referred to above.
 
 # So, building a plot requires a recursive procedure. On the way down from the
-# outermost block, we build up a tree of Plots as we go. It's *on the way back up*,
+# outermost block, we build up a tree of Plots as we go. It's _on the way back up_,
 # though, that we calcuate SizePrefs for the Plots that represent lists or tuples.
 
 class Plot(object):
@@ -114,31 +114,32 @@ class Runner(object):
     def _run(self):
         self._refresh.set() # show at start once without an event triggering
         with self._term.fullscreen():
-            try:
-                while True:
-                    if self._done.is_set():
-                        break
-                    if not self._refresh.wait(.5):
-                        continue
-                    with self._lock:
-                        if self._not_just_dirty.is_set():
-                            #just_dirty = False
-                            self._not_just_dirty.clear()
-                        #else:
-                            #just_dirty = True
-                        self.load(self._block.grid)
-                        self.display_plot(self._root_plot,
-                                          0, 0,                                   # x, y
-                                          self._term.width, self._term.height,  # w, h
-                                          self._term)
-                        self._refresh.clear()
-            except Exception as e:
-                debug = True
-                if debug:
-                    logging.exception("30 seconds to view exception")
-                    sleep(30)
-                self.stop()
-                # TODO. This doesn't successfully stop the application
+            with self._term.hidden_cursor():
+                try:
+                    while True:
+                        if self._done.is_set():
+                            break
+                        if not self._refresh.wait(.5):
+                            continue
+                        with self._lock:
+                            if self._not_just_dirty.is_set():
+                                #just_dirty = False
+                                self._not_just_dirty.clear()
+                                #else:
+                                #just_dirty = True
+                            self.load(self._block.grid)
+                            self.display_plot(self._root_plot,
+                                              0, 0,                                   # x, y
+                                              self._term.width, self._term.height,  # w, h
+                                              self._term)
+                            self._refresh.clear()
+                except Exception as e:
+                    debug = True
+                    if debug:
+                        logging.exception("10 seconds to view exception")
+                        sleep(10)
+                    self.stop()
+                    # TODO. This doesn't successfully stop the application
 
     def update(self):
         self._refresh.set()
@@ -172,6 +173,10 @@ class Runner(object):
         def merge_sizeprefs(plots):
             w_hard_min, w_hard_max, h_hard_min, h_hard_max = 0, [], 0, []
             # Hard maxes merge only if *all* subplots have a hard_max set
+            # because if any subplot will take as much as it can, we want
+            # the (super)plot to claim as much space as it can. If all
+            # subplots have a hard_max specified, we know exactly the max
+            # space needed so we claim that.
             num_w_hard_maxes, num_h_hard_maxes = 0, 0
             for plot in subplots:
                 w_hard_min += plot.w_sizepref.hard_min
@@ -180,8 +185,9 @@ class Runner(object):
                 h_hard_min += plot.h_sizepref.hard_min
                 if plot.h_sizepref.hard_max: num_h_hard_maxes += 1
                 h_hard_max += plot.h_sizepref.hard_max
-            w_hard_max = [max(w_hard_max)] if num_w_hard_maxes == len(subplots) else []
-            h_hard_max = [max(h_hard_max)] if num_h_hard_maxes == len(subplots) else []
+            # TODO max or sum?
+            w_hard_max = [sum(w_hard_max)] if num_w_hard_maxes == len(subplots) else []
+            h_hard_max = [sum(h_hard_max)] if num_h_hard_maxes == len(subplots) else []
             w_sizepref = SizePref(hard_min=w_hard_min,
                                   hard_max=w_hard_max)
             h_sizepref = SizePref(hard_min=h_hard_min,
@@ -191,9 +197,18 @@ class Runner(object):
         subplots = []
         if not layout:
             for _, block in blocks.items():
-                # if there's no grid there's only one block.
+                # if there's no layout there's only one block.
                 # merge its sizeprefs (which contain numbers) into
-                # new sizeprefs containing lists.
+                # new sizeprefs containing lists. hard_max'es can
+                # contain either the string 'text' meaning 'the
+                # size of the amount of text you can fit in the
+                # plot, or they can contain a float, which is treated
+                # as an int, but using float allows for infinity.
+                # TODO: how is 'text' different from float('inf')
+                # exactly? Don't they both mean use all space avail-
+                # able?
+
+                # handle w_sizepref
                 hard_max = []
                 if block.w_sizepref.hard_max == 'text':
                     hard_max = [block.text_cols]
@@ -202,6 +217,7 @@ class Runner(object):
                 w_sizepref = SizePref(hard_min=block.w_sizepref.hard_min,
                                       hard_max=hard_max)
 
+                # handle h_sizepref
                 hard_max = []
                 if block.h_sizepref.hard_max == 'text':
                     hard_max = [block.text_rows]
@@ -211,6 +227,7 @@ class Runner(object):
                                       hard_max=hard_max)
 
                 # This return is purposely *inside* the loop
+                # TODO why? because there's no layout?
                 return Plot(w_sizepref, h_sizepref, block=block)
         for element in layout:
             if type(element) == int:
@@ -235,12 +252,12 @@ class Runner(object):
         if plot.block:
             plot.block.display(w, h, x, y, term)
         else:
-            for subplot, new_x, new_y, new_w, new_h in self.divvy(plot.subplots, x, y, w, h, plot.horizontal):
+            for subplot, new_x, new_y, new_w, new_h in Runner.divvy(plot.subplots, x, y, w, h, plot.horizontal):
                 self.display_plot(subplot, new_x, new_y, new_w, new_h, term, just_dirty)
 
     # Divvy up the space available to a series of plots among them
     # by referring to SizePrefs for each.
-    def divvy(self, plots, x, y, w, h, horizontal):
+    def divvy(plots, x, y, w, h, horizontal):
         def calc_block_size(total_size, num_blocks, block_index):
             rem = total_size % num_blocks
             base = total_size // num_blocks
@@ -251,11 +268,20 @@ class Runner(object):
         for i in range(n):
             memo[i] = {'x':0, 'y':0, 'w':0, 'h':0}
 
+        # The main complications in divvying up the available space for the
+        # plots are in satisfying the hard_min and hard_max preferences for
+        # each plot.
+        # - hard_mins are relatively easy. A hard_min is a single value -- the
+        # sum of all min for all this plot's subplots. We just reserve the
+        # hard_min if it's available, and that's it.
+        # - hard_maxes are harder. A hard_max value is an array of all hard_max
+        # values for this plot's subplots.
+
         # handle hard_min first, but save off hard_maxes
         rem = w if horizontal else h  # remaining space to divvy
-        hard_maxes = []
-        unmet_hard_maxes_indexes = set()
-        free_indexes = set()
+        hard_maxes = []  # tuple: (remaining_allowed, plot_index)
+        unmet_hard_maxes_indexes = set()  # ??? TODO
+        free_indexes = set()  # we can assign unlimited space to these blocks
         for i, plot in enumerate(plots):
             if horizontal:
                 prefs, xy, wh = plot.w_sizepref, 'x', 'w'
@@ -263,12 +289,14 @@ class Runner(object):
                 prefs, xy, wh = plot.h_sizepref, 'y', 'h'
 
             if rem > 0:
-                amount = min(rem, prefs.hard_min)
+                # Reserve only the minimum space required
+                #amount = min(rem, prefs.hard_min)
+                amount = min(0, prefs.hard_min)
                 rem -= amount
                 memo[i][wh] += amount
             if prefs.hard_max:
                 total_hard_max = sum(prefs.hard_max)
-                # hard_maxes is a tuple: (remaining_required, plot_index)
+                # hard_maxes is a tuple: (remaining_allowed, plot_index)
                 hard_maxes.append((max(0, (total_hard_max - memo[i][wh])), i))
                 if memo[i][wh] < total_hard_max:
                     #hard_maxes.append((total_hard_max,i))
@@ -339,13 +367,14 @@ class Runner(object):
             out.append((plot, m['x'], m['y'], m['w'], m['h']))
         return out
 
+
 if __name__ == '__main__':
     blocks = {}
     blocks[1] = Block('blx')
     blocks[2] = Block('bly')
     blocks[3] = Block('blz')
     g = Grid([1, (2,3)], blocks)
-    top = Block('top', grid=g)
+    top = BareBlock(grid=g)
     runner = Runner(top)
     plot = runner.build_plot(a._layout, a._slots)
     print(plot)

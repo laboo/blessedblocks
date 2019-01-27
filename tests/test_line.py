@@ -53,6 +53,38 @@ def test_blank_line():
     print(('\n' + line.display + '{t.normal}').format(t=term))
     assert line.markup == right_just
     assert line.plain == right_just
+
+def test_repeat_to_width():
+    line = Line.repeat_to_width('wxyz', 10)
+    assert line.plain == 'wxyzwxyzwx'
+    assert line.display == '{t.normal}wxyzwxyzwx'    
+
+def test_repeat_to_width_with_seqs():
+    line = Line.repeat_to_width('w{t.blue}xy{t.red}z', 10)
+    print(('\n' + line.display + '{t.normal}').format(t=term))
+    assert line.plain == 'wxyzwxyzwx'
+    assert line.display == 'w{t.blue}xy{t.red}zw{t.blue}xy{t.red}zw{t.blue}x'
+
+def test_repeat_to_width_with_seqs():
+    line = Line.repeat_to_width('{t.red}-{t.white}-{t.blue}-', 4)
+    print(('\n' + line.display + '{t.normal}').format(t=term))
+    assert line.plain == '----'
+    assert line.display == '{t.red}-{t.white}-{t.blue}-{t.red}-'
+
+def test_vertical_border():
+    border = 'x\n'
+    line = Line.repeat_to_width(border, 10 * len(border))
+    print(('\n' + line.display + '{t.normal}').format(t=term))
+    assert line.plain == border * 10
+    assert line.display == '{t.normal}' + border * 10
+
+def test_vertical_border_complex():
+    border = '{t.red}r{t.white}w{t.blue}b\n'
+    text, seqs, last_seq = border_line = Line.parse(border)
+    line = Line.repeat_to_width(border, 10 * len(text))
+    print(('\n' + line.display + '{t.normal}').format(t=term))
+    assert line.plain == text * 10
+    assert line.display == border * 10
     
 ''' TODO convert these
 def test_simple():
