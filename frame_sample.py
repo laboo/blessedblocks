@@ -19,7 +19,12 @@ eblocks[1] = FramedBlock(BareBlock('eblock1',hjust='>', vjust='='),
 eblocks[2] = BareBlock('eblock2', hjust='<', vjust='v')
 eg = Grid(layout=[(1,2)], blocks=eblocks)
 
-# Embed the embedded grid into an outer block
+# These 3 lines will show just the embedded grid
+#top = BareBlock(grid=eg)
+#r = Runner(top)
+#r.start()
+
+# This will embed the embedded grid into an outer block with just a title
 outer = BareBlock("", grid=eg)
 
 # Put the outer block into a grid by itself
@@ -27,7 +32,7 @@ layout = [1]
 blocks = {}
 blocks[1] = FramedBlock(outer,
                         title='My Title',
-                        title_sep='{t.cyan}-')
+                        title_sep='{t.red}-')
 g = Grid(layout, blocks)
 
 # Now put that in one final top block for running
