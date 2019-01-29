@@ -6,28 +6,31 @@ from blessedblocks.bare_block import BareBlock
 from blessedblocks.framed_block import FramedBlock
 from blessedblocks.block import Grid, SizePref
 from blessedblocks.runner import Runner
-from blessedblocks.line import Line
-from threading import Event, Thread, Lock
-from tabulate import tabulate
-import datetime
-from blessed import Terminal
 
-term = Terminal()
+# Create an embedded block with its own grid
+eblocks = {}
+eblocks[1] = FramedBlock(BareBlock('eblock1',hjust='>', vjust='='),
+                         top_border='{t.green}x',
+                         bottom_border='{t.blue}y',
+                         #left_border='{t.yellow}z',
+                         #right_border='{t.magenta}a',
+                         title='InnerTop',
+                         title_sep='{t.yellow}-')
+eblocks[2] = BareBlock('eblock2', hjust='<', vjust='v')
+eg = Grid(layout=[(1,2)], blocks=eblocks)
+
+# Embed the embedded grid into an outer block
+outer = BareBlock("", grid=eg)
+
+# Put the outer block into a grid by itself
 layout = [1]
 blocks = {}
-main = BareBlock('abc123', hjust='^', vjust='=',
-                 w_sizepref = SizePref(hard_min=1, hard_max=1),
-                 h_sizepref = SizePref(hard_min=1, hard_max=1))
-
-blocks[1] = FramedBlock(main,
-                        top_border='{t.blue}x',
-                        bottom_border='{t.blue}y',
-                        left_border='{t.red}z',
-                        right_border='{t.green}a',
+blocks[1] = FramedBlock(outer,
                         title='My Title',
                         title_sep='{t.cyan}-')
-
 g = Grid(layout, blocks)
+
+# Now put that in one final top block for running
 top = BareBlock(grid=g)
 r = Runner(top)
 r.start()

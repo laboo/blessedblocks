@@ -12,12 +12,10 @@ class VFillBlock(Block):
             border_text, seqs, last_seq = Line.parse(self.text)
             out = []
             line = Line(self.text, width, '<')
-
             for h in range(height):
                 if term:
                     with term.location(x=x, y=y+h):
                         print(line.display.format(t=term), end='')
-                        #print(line.display, end='')
                 else:
                     out.append(line.display)
             if not term:

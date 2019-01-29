@@ -110,7 +110,7 @@ class Block(object, metaclass=abc.ABCMeta):
     #MIDDLE_DOT = u'\u00b7'
 
     def __init__(self,
-                 text=' ',
+                 text=None,
                  hjust='<',  # horizontally left-justified within block
                  vjust='^',  # vertically centered within block
                  # The SizePrefs indicate how much screen real estate (width and height) this
@@ -122,7 +122,7 @@ class Block(object, metaclass=abc.ABCMeta):
         self.write_lock = RLock()
         self.hjust = hjust
         self.vjust = vjust
-        self.text = text if text else ' '
+        self.text = text if text else None
         self.w_sizepref = w_sizepref
         self.h_sizepref = h_sizepref
         self.grid = grid
