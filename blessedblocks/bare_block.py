@@ -7,13 +7,14 @@ class BareBlock(Block):
                  text=None,
                  hjust='<',  # horizontally left-justified within block
                  vjust='^',  # vertically centered within block
+                 block_just=True,  # justify block as a whole vs line-by-line
                  # The SizePrefs indicate how much screen real estate (width and height) this
                  # block desires/requires when displayed. Here, we default the block to
                  # as-much-as-you-got-but-none-is-fine.
                  w_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
                  h_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
                  grid=None):
-        super().__init__(text=text, hjust=hjust, vjust=vjust,
+        super().__init__(text=text, hjust=hjust, vjust=vjust, block_just=block_just,
                          w_sizepref=w_sizepref, h_sizepref=h_sizepref, grid=grid)
         self._prev_seq = '{t.normal}'
 
@@ -25,7 +26,7 @@ class BareBlock(Block):
                 available_for_text_cols = max(0, width)
 
                 all_btext_rows = []
-                for row in self.text.rstrip().split('\n'):
+                for row in self.text.split('\n'):
                     all_btext_rows.append(row)  # TODO all we really need is a count here, right?
                 useable_btext_rows = all_btext_rows[:available_for_text_rows]
 

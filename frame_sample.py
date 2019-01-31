@@ -31,6 +31,7 @@ outer = BareBlock("", grid=eg)
 layout = [1]
 blocks = {}
 blocks[1] = FramedBlock(outer,
+                        no_borders=True,
                         title='My Title',
                         title_sep='{t.red}-')
 g = Grid(layout, blocks)

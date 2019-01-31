@@ -73,6 +73,12 @@ class Runner(object):
     def __repr__(self):
         return 'runner'
 
+    def term_width(self):
+        return self._term.width
+
+    def term_height(self):
+        return self._term.height
+
     def _on_kill(self, *args):
         if self._stop_event:
             self._stop_event.set()
@@ -211,7 +217,7 @@ class Runner(object):
                 # handle w_sizepref
                 hard_max = []
                 if block.w_sizepref.hard_max == 'text':
-                    hard_max = [block.text_cols]
+                    hard_max = [block.num_text_cols]
                 elif block.w_sizepref.hard_max != float('inf'):
                     hard_max = [block.w_sizepref.hard_max]
                 w_sizepref = SizePref(hard_min=block.w_sizepref.hard_min,
@@ -220,7 +226,7 @@ class Runner(object):
                 # handle h_sizepref
                 hard_max = []
                 if block.h_sizepref.hard_max == 'text':
-                    hard_max = [block.text_rows]
+                    hard_max = [block.num_text_rows]
                 elif block.h_sizepref.hard_max != float('inf'):
                     hard_max = [block.h_sizepref.hard_max]
                 h_sizepref = SizePref(hard_min=block.h_sizepref.hard_min,

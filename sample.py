@@ -3,6 +3,8 @@ import os, sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "blessedblocks"))
 # Previous two lines not needed if blessedblocks modules is installed
 from blessedblocks.block import Block, Grid, SizePref
+from blessedblocks.bare_block import BareBlock
+from blessedblocks.framed_block import FramedBlock
 from blessedblocks.line import Line
 from blessedblocks.runner import Runner
 from threading import Event, Thread, Lock
@@ -20,7 +22,7 @@ FILLER = ('01234}6789012345678901234567890123456789\n'
           '6123456789012345678901234567890123456789\n'
           '7123456789012345678901234567890123456789\n'
           '8123456789012345678901234567890123456789\n'
-          '9123{t.blue}456789012345678901234567890123456789\n')
+          '9123{t.blue}456789012345678901234567890123456789')
 
 # Specify the positioning of the blocks.
 # A list is horizontal, a tuple is vertical
@@ -29,104 +31,90 @@ grid = [(4, [(1,2,3), (8,9), (5,[6,7])])]
 # Build the contents of each of the blocks specified in the grid
 blocks = {}
 
-blocks[1] = Block('Block1') # all the defaults
-blocks[1].update("{t.normal}A block with no title\n" +
-                 Line.repeat_to_width('{t.red}-{t.white}-{t.blue}-')
+blocks[1] = BareBlock(None)
 
-blocks[2] = Block('Block with colors in title.',
-                  title='{t.cyan}Block {t.red}#2{t.normal}',
-                  hjust='>') # with a title, right justified
-blocks[2].update(FILLER)
+blocks[2] = FramedBlock(BareBlock(FILLER, hjust='>'), # with a title, right justified
+                        title='{t.cyan}Block {t.red}#2{t.normal}',
+                        title_sep='-')
 
-blocks[3] = Block('Block3',
-                  left_border=None,
-                  right_border=None,
-                  top_border=None,
-                  bottom_border=None,
-                  vjust='v',
-                  title='Block with no borders')
-blocks[3].update(FILLER)
+blocks[3] = FramedBlock(BareBlock(FILLER, vjust='v'),
+                        no_borders=True,
+                        title='Block with no borders',
+                        title_sep='-')
 
-blocks[4] = Block('Block4',
-                  left_border=None,
-                  right_border=None,
-                  top_border=None,
-                  bottom_border=None,
-                  hjust='^',
-                  vjust='=',
-                  h_sizepref = SizePref(hard_min=0, hard_max=1),
-                  #title='The Current Time centered') # updated in loop below
-                  title='')
-blocks[4].update(str(datetime.datetime.now()))
-blocks[5] = Block('Block5', title='Block #5',
-                  h_sizepref = SizePref(hard_min=0, hard_max='text')
-                  )
-blocks[5].update(FILLER)
+blocks[4] = BareBlock(str(datetime.datetime.now()), hjust='^', vjust='=',
+                      h_sizepref = SizePref(hard_min=0, hard_max=1))
 
-blocks[6] = Block("tabulate block hjust=^", # text at bottom of block
-                  hjust='^',
-                  title='A tabulate block')
+blocks[5] = FramedBlock(BareBlock(FILLER,
+                                  h_sizepref = SizePref(hard_min=0, hard_max='text')),
+                        title='Block #5',
+                        title_sep='-')
 
-blocks[6].update(tabulate([['col1', 'col2'], [1.23, 2.456]]))
+blocks[6] = FramedBlock(BareBlock(tabulate([['col1', 'col2'], [1.23, 2.456]]), # text at bottom of block
+                                  hjust='^'),
+                        title="tabulate block hjust=^",
+                        title_sep='-')
 
-blocks[7] = Block('Block7', title='Block #7')
-blocks[7].update(FILLER)
+blocks[7] = FramedBlock(BareBlock(FILLER),title='Block #7',title_sep='-')
 
 headers=["Planet","R (km)", "mass (x 10^29 kg)"]
 table = [["Sun",696000,1989100000],["Earth",6371,5973.6],
          ["Moon",1737,73.5],["Mars",3390,641.85]]
 
-blocks[8] = Block('Block8', # text in center of block
-                  left_border='{t.blue}# ',
-                  right_border='{t.green} #',
-                  top_border='{t.magenta}#',
-                  bottom_border='{t.green}#',
-                  hjust='^',
-                  vjust='=',
-                  title='Tabulate hjust=^, vjust==')
-blocks[8].update(tabulate(table, headers=headers))
-
+blocks[8] = FramedBlock(BareBlock(tabulate(table, headers=headers),
+                                  hjust='^',
+                                  vjust='='),
+                        left_border='{t.blue}#',
+                        right_border='{t.green}#',
+                        top_border='{t.magenta}# ',
+                        bottom_border='{t.green}#',
+                        title='Tabulate hjust=^, vjust==', title_sep='-')
 
 # Create an embedded block with its own grid
 eblocks = {}
-eblocks[1] = Block('eblock1', title='eblock1')
-eblocks[2] = Block('eblock2', title='eblock2')
-eblocks[1].update("some text")
-eblocks[2].update("more text")
+
+triangle = '*\n***\n*****\n*******\n*********'
+block_just_block = BareBlock(triangle, block_just=True)
+line_just_block = BareBlock(triangle, block_just=False)
+eblocks[1] = FramedBlock(block_just_block, title='block_just=True', title_sep='-')
+eblocks[2] = FramedBlock(line_just_block, title='block_just=False', title_sep='-')
 
 eg = Grid(layout=[(1,2)], blocks=eblocks)
-bb = Block("embedded", grid=eg)
+bb = BareBlock(None, grid=eg)
 
 blocks[9] = bb  # stick it in slot 9
 
 g = Grid(layout=grid, blocks=blocks)
-ba = Block("", grid=g)
+ba = BareBlock(None, grid=g)
 
 # Main logic
 stop_event = Event()
 r = Runner(ba, stop_event=stop_event)
-
 r.start()
 
-for i in range(300):
+blocks[1].text = ("{t.normal}A bare block with just a rg&b horizontal line\n" +
+                  Line.repeat_to_width('{t.red}-{t.green}-{t.blue}-', r.term_width()).display)
+
+# Refresh some of the blocks in a tight loop
+for i in range(100):
     if r.app_refresh_event.is_set():
         blocks[2].title = 'got event ' + str(i)
         r.app_refresh_event.clear()
-    stop_event.wait(.1)
+    stop_event.wait(0.1)
     blocks[2].top_border = str(i%10)
     import random
-    blocks[2].hjust = random.choice(['<', '^', '>'])
-    blocks[4].update(str(datetime.datetime.now()))
-    eblocks[1].update(str(i))
+    just = random.choice(['<', '^', '>'])
+    block_just_block.hjust = just
+    line_just_block.hjust = just
+    blocks[4].text = 'bare block ' + str(datetime.datetime.now())
 
-# Replace the entire grid
+# Replace the entire grid with a new one using some of the original blocks
 g2 = Grid(layout=[2,3,4,9], blocks=blocks)
 r.load(g2)
 
-for i in range(300):
+# Loop again changing just the block with the time
+for i in range(100):
     stop_event.wait(.1)
-    blocks[4].update(str(datetime.datetime.now()))
+    blocks[4].text = 'bare_block ' + str(datetime.datetime.now())
 
 r.stop()
-
-

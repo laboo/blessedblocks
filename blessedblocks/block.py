@@ -107,12 +107,13 @@ def safe_get(method):
     return _impl
 
 class Block(object, metaclass=abc.ABCMeta):
-    #MIDDLE_DOT = u'\u00b7'
+    MIDDLE_DOT = u'\u00b7'
 
     def __init__(self,
                  text=None,
                  hjust='<',  # horizontally left-justified within block
                  vjust='^',  # vertically centered within block
+                 block_just=True,  # justify block as a whole vs line-by-line
                  # The SizePrefs indicate how much screen real estate (width and height) this
                  # block desires/requires when displayed. Here, we default the block to
                  # as-much-as-you-got-but-none-is-fine.
@@ -122,14 +123,15 @@ class Block(object, metaclass=abc.ABCMeta):
         self.write_lock = RLock()
         self.hjust = hjust
         self.vjust = vjust
+        self.block_just = block_just
         self.text = text if text else None
         self.w_sizepref = w_sizepref
         self.h_sizepref = h_sizepref
         self.grid = grid
-        # Below here non-thread safe attrs: TODO (document or make thread-safe)
-        self._num_text_rows = 0
-        self._num_text_cols = 0
+        self.num_text_rows = 0
+        self.num_text_cols = 0
         self.dirty_event = None
+        # Below here non-thread safe attrs: TODO (document or make thread-safe)
         self.prev_seq = ''
 
     ''' TODO: Figure this out
@@ -153,13 +155,21 @@ class Block(object, metaclass=abc.ABCMeta):
     @safe_set
     def text(self, val):
         if val and (not hasattr(self, '_text') or self._text != val):
-            self._text = val
             rows = val.split('\n')
             clean_rows = []
             for row in rows:
                 clean_rows.append(re.sub(r'{t\..*?}', '', row))
-            self._num_text_cols = max(map(len, clean_rows))
-            self._num_text_rows = len(clean_rows)
+            self.num_text_cols = max(map(len, clean_rows))
+            self.num_text_rows = len(clean_rows)
+
+            if self.block_just:
+                built_rows = []
+                for i, crow in enumerate(clean_rows):
+                    built_rows.append(rows[i] + (' ' * (self.num_text_cols - len(crow))))
+                self._text = '\n'.join(built_rows)
+            else:
+                self._text = val
+
             try:
                 if self.dirty_event:
                     self.dirty_event.set()
@@ -200,6 +210,15 @@ class Block(object, metaclass=abc.ABCMeta):
 
     @property
     @safe_get
+    def block_just(self): return self._block_just
+
+    @block_just.setter
+    @safe_set
+    def block_just(self, val):
+        self._block_just = val
+
+    @property
+    @safe_get
     def h_sizepref(self): return self._h_sizepref
 
     @h_sizepref.setter
@@ -222,4 +241,20 @@ class Block(object, metaclass=abc.ABCMeta):
     @grid.setter
     @safe_set
     def grid(self, val): self._grid = val
+
+    @property
+    @safe_get
+    def num_text_rows(self): return self._num_text_rows
+
+    @num_text_rows.setter
+    @safe_set
+    def num_text_rows(self, val): self._num_text_rows = val
+
+    @property
+    @safe_get
+    def num_text_cols(self): return self._num_text_cols
+
+    @num_text_cols.setter
+    @safe_set
+    def num_text_cols(self, val): self._num_text_cols = val
 

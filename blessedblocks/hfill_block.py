@@ -3,8 +3,8 @@ from .line import Line
 
 class HFillBlock(Block):
     def __init__(self, text):
-        maxes = 0 if not text else 1  # Don't take up space if there's not text
-        super().__init__(text=text, h_sizepref=SizePref(hard_min=maxes, hard_max=maxes))
+        maxes = 0 if not text else 1  # Don't take up space if there's no text
+        super().__init__(text=text, h_sizepref=SizePref(hard_min=maxes, hard_max='text'))
 
     def display(self, width, height, x, y, term=None):
         if not self.text:
