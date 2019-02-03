@@ -3,8 +3,7 @@ import os, sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "blessedblocks"))
 # Previous two lines not needed if blessedblocks modules is installed
 from blessedblocks.block import Block, Grid, SizePref
-from blessedblocks.bare_block import BareBlock
-from blessedblocks.framed_block import FramedBlock
+from blessedblocks.blocks import BareBlock, FramedBlock
 from blessedblocks.line import Line
 from blessedblocks.runner import Runner
 from threading import Event, Thread, Lock
