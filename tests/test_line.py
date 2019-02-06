@@ -8,21 +8,18 @@ term = Terminal()
 def test_parse_dups():
     line = Line('{t.green}xy{t.green}z', 3, '^')
     print(('\n' + line.display + '{t.normal}').format(t=term))
-    assert line.markup == '{t.green}xyz'
     assert line.plain == 'xyz'
     assert line.last_seq == '{t.green}'
 
 def test_parse_contig():
     line = Line('{t.green}{t.blue}xyz', 3, '^')
     print(('\n' + line.display + '{t.normal}').format(t=term))
-    assert line.markup == '{t.blue}xyz'
     assert line.plain == 'xyz'
     assert line.last_seq == '{t.blue}'
 
 def test_parse_contig_3():
     line = Line('{t.green}{t.blue}{t.red}xyz', 3, '^')
     print(('\n' + line.display + '{t.normal}').format(t=term))
-    assert line.markup == '{t.red}xyz'
     assert line.plain == 'xyz'
     assert line.last_seq == '{t.red}'
     
@@ -30,28 +27,24 @@ def test_width_just_center():
     line = Line('{t.green}xy{t.blue}z', 12, '^')
     left_just, right_just = 4*' ', 5*' '
     print(('\n' + line.display + '{t.normal}').format(t=term))
-    assert line.markup == left_just + '{t.green}xy{t.blue}z' + right_just
     assert line.plain == left_just + 'xyz' + right_just
 
 def test_width_just_left():
     line = Line('{t.green}xy{t.blue}z', 12, '<')
     left_just, right_just = '', 9*' '
     print(('\n' + line.display + '{t.normal}').format(t=term))
-    assert line.markup == left_just + '{t.green}xy{t.blue}z' + right_just
     assert line.plain == left_just + 'xyz' + right_just
 
 def test_width_just_right():
     line = Line('{t.green}xy{t.blue}z', 12, '>')
     left_just, right_just = 9*' ', ''
     print(('\n' + line.display + '{t.normal}').format(t=term))
-    assert line.markup == left_just + '{t.green}xy{t.blue}z' + right_just
     assert line.plain == left_just + 'xyz' + right_just
 
 def test_blank_line():
     line = Line('', 12, ',')
     left_just, right_just = '', 12*' '
     print(('\n' + line.display + '{t.normal}').format(t=term))
-    assert line.markup == right_just
     assert line.plain == right_just
 
 def test_repeat_to_width():
@@ -85,77 +78,67 @@ def test_vertical_border_complex():
     print(('\n' + line.display + '{t.normal}').format(t=term))
     assert line.plain == text * 10
     assert line.display == border * 10
-    
-''' TODO convert these
+
 def test_simple():
-    line = Line('simple line of text')
+    line = Line('simple line of text', 19, '<')
     assert line.plain == 'simple line of text'
-    assert line.markup == line.plain
-    # {t.normal} always appended to the end of display
-    assert line.display == line.plain + '{t.normal}'
+    assert line.display == line.plain
     assert line.last_seq is None
 
 def test_just_tag():
     text = '{t.green}'
-    line = Line(text)
+    line = Line(text, 0, '<')
     assert line.plain == ''
-    assert line.markup == '{t.green}'
-    assert line.display == '{t.green}{t.normal}'
+    assert line.display == ''  # ???
     assert line.last_seq == '{t.green}'
 
 def test_two_trailing_tags():
-    # green is irrelevant, so dropped from markup and display
+    # green is irrelevant, so dropped from display
     text = '{t.green}{t.blue}'
-    line = Line(text)
+    line = Line(text, 0, '<')
     assert line.plain == ''
-    assert line.markup == '{t.blue}'
-    assert line.display == '{t.blue}{t.normal}'
+    assert line.display == ''
     assert line.last_seq == '{t.blue}'
 
 def test_two_trailing_tags_with_text():
-    # green is irrelevant, so dropped from markup and display
+    # both tags dropped from display because no text follows them
     text = 'abc{t.green}{t.blue}'
-    line = Line(text)
+    line = Line(text, 3, '<')
     assert line.plain == 'abc'
-    assert line.markup == 'abc{t.blue}'
-    assert line.display == 'abc{t.blue}{t.normal}'
+    assert line.display == 'abc'
     assert line.last_seq == '{t.blue}'
 
 def test_complex():
     text = '{t.green}{}{}}{blac{t.yellow}k justp{t.cyan}laintext{t.pink}x'
-    line = Line(text)
+    line = Line(text, 26, '<')
     # tags removed,and { and } doubled when not in tag
     assert line.plain == '{}{}}{black justplaintextx'
 
-    assert line.markup == text
     # { and } doubled when not part of tag, and end with normal
-    assert line.display == '{t.green}{{}}{{}}}}{{blac{t.yellow}k justp{t.cyan}laintext{t.pink}x{t.normal}'
+    assert line.display == '{t.green}{{}}{{}}}}{{blac{t.yellow}k justp{t.cyan}laintext{t.pink}x'
     assert line.last_seq == '{t.pink}'
 
 def test_complex_ends_in_non_normal_tag():
     text = '{t.green}{}{}}{blac{t.yellow}k justp{t.cyan}laintext{t.pink}'
-    line = Line(text)
+    line = Line(text, 25, '<')
     # tags removed,and { and } doubled when not in tag
     assert line.plain == '{}{}}{black justplaintext'
     # Useless tags at end of markup are removed
-    assert line.markup == text
     # { and } doubled when not part of tag, and end with normal
-    assert line.display == '{t.green}{{}}{{}}}}{{blac{t.yellow}k justp{t.cyan}laintext{t.pink}{t.normal}'
+    assert line.display == '{t.green}{{}}{{}}}}{{blac{t.yellow}k justp{t.cyan}laintext'
     assert line.last_seq == '{t.pink}'
-    
+
 def test_broken_tag_front():
     text = 't.green}xyz'
-    line = Line(text)
+    line = Line(text, 11, '<')
     assert line.plain == text
-    assert line.markup == text
-    assert line.display == 't.green}}xyz{t.normal}'  # non-tag brackets doubled in display
+    assert line.display == 't.green}}xyz'  # non-tag brackets doubled in display
     assert line.last_seq is None
 
 def test_last_sequence_normal():
     text = 'hi there, {t.red}Red{t.normal}!'
-    line = Line(text)
+    line = Line(text, 14, '<')
     assert line.plain == 'hi there, Red!'
-    assert line.markup == text
-    assert line.display == text  # already ends in normal
+    assert line.display == text
     assert line.last_seq == '{t.normal}'
-'''
+

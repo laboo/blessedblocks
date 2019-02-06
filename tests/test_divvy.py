@@ -1,7 +1,7 @@
 import pytest
 from blessedblocks.line import Line
 from blessedblocks.block import Grid, SizePref
-from blessedblocks.bare_block import BareBlock
+from blessedblocks.blocks import BareBlock
 from blessedblocks.runner import Runner, Plot
 from blessed import Terminal
 

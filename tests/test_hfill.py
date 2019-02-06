@@ -1,5 +1,5 @@
 import pytest
-from blessedblocks.hfill_block import HFillBlock
+from blessedblocks.blocks import HFillBlock
 from blessed import Terminal
 
 term = Terminal()

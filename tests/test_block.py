@@ -1,5 +1,5 @@
 import pytest
-from blessedblocks.bare_block import BareBlock
+from blessedblocks.blocks import BareBlock
 from blessed import Terminal
 
 term = Terminal()

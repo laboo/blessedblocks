@@ -6,14 +6,18 @@ import math
 
 # Not thread-safe
 class Line():
-    '''A iine of formatted text in a blessed block. Most notably, this line
+    '''A line of formatted text in a blessed block. Most notably, this line
     does not wrap. Instead, it truncates at the block width value. It supports
     colored text using the blessed color tags, eg, ${blue}blue text{$normal}.
-    Three different views of the text of the line are available, and they
+    Two different views of the text of the line are available, and they
     are adjusted dynamically as the width of the block changes: (1) plain,
     which is the text minus any color tabs, (2) display, which when printed
-    shows the plain text with colors, and (3) markup, which the text with
-    color tags, but not necessarily fit for printing.
+    shows the plain text with colors. When viewed outside of the blessed 
+    terminal, display differs from plain in two ways. It shows the color tags,
+    and it doubles curly braces in order to escape them. Also note that tags
+    that don't have an affect do not show up in display. For example, tags
+    that have no text following them before the end of the line (as determined
+    dynamically by the width of the block) or before the next tag.
     '''
     def __init__(self, blessed_text, width, just):
         '''Create a Line object
@@ -22,7 +26,7 @@ class Line():
             blessed_text (str): Text of any length which may contain blessed color tags.
 
         Returns:
-            nothing, but the plain, display and markup attributes are made available.
+            nothing, but the plain and display attributes are made available.
         '''
         self._full = blessed_text
         self._text, self._seqs, self.last_seq = Line.parse(blessed_text)
@@ -83,26 +87,22 @@ class Line():
 
     def _build(self, begin, width, just):
         plain = ''
-        markup = ''
         display = ''
         last_seq = ''
         start = min(0,begin)
         stop = min(width,len(self._text))
         for i in range(start, stop):
             if i in self._seqs:
-                markup += self._seqs[i]
                 display += self._seqs[i]
                 last_seq = self._seqs[i]
             c = self._text[i]
             plain += c
-            markup += c
             display += self._escape_brackets(c)
 
         left_pad = right_pad = ''
         if width > stop:
             left_pad, right_pad = self._calc_just(just, width - stop)
         self.plain = left_pad + plain + right_pad
-        self.markup = left_pad + markup + right_pad
         self.display = left_pad + display + right_pad
 
     def resize(self, begin, width, just):
@@ -135,6 +135,5 @@ if __name__ == '__main__':
     line.resize(0,len(line.plain), just)
     print(line._full)
     print(line.plain)
-    print(line.markup)
     print(line.display)
     print(line.display.format(t=term) + '*')
