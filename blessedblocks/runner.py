@@ -33,6 +33,10 @@ import logging
 # outermost block, we build up a tree of Plots as we go. It's _on the way back up_,
 # though, that we calcuate SizePrefs for the Plots that represent lists or tuples.
 
+# Uncomment to debug deadlock problems
+#import stacktracer
+#stacktracer.trace_start("/tmp/trace.html",interval=2,auto=True)
+
 class Plot(object):
     def __init__(self,
                  w_sizepref=SizePref(hard_min=0, hard_max=[]),
@@ -58,6 +62,7 @@ class Plot(object):
 
 class Runner(object):
     def __init__(self, block, stop_event=None):
+
         self._block = block
         self._plot = Plot()
         self._refresh = Event()
@@ -86,7 +91,8 @@ class Runner(object):
 
     def update_all(self):
         self._not_just_dirty.set()
-        self._refresh.set()
+        if not self._refresh.is_set():
+            self._refresh.set()
 
     def _on_resize(self, *args):
         self.update_all()
@@ -148,7 +154,8 @@ class Runner(object):
                     # TODO. This doesn't successfully stop the application
 
     def update(self):
-        self._refresh.set()
+        if not self._refresh.is_set():
+            self._refresh.set()
 
     def update_block(self, index, block):
         with self._lock:
