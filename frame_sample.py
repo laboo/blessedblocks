@@ -2,9 +2,8 @@
 import os, sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "blessedblocks"))
 # Previous two lines not needed if blessedblocks modules is installed
-from blessedblocks.bare_block import BareBlock
-from blessedblocks.framed_block import FramedBlock
 from blessedblocks.block import Grid, SizePref
+from blessedblocks.blocks import BareBlock, FramedBlock
 from blessedblocks.runner import Runner
 
 # Create an embedded block with its own grid
