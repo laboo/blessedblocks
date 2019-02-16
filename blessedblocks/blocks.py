@@ -24,8 +24,12 @@ class VFillBlock(Block):
 
 class HFillBlock(Block):
     def __init__(self, text):
-        maxes = 0 if not text else 1  # Don't take up space if there's no text
-        super().__init__(text=text, h_sizepref=SizePref(hard_min=maxes, hard_max='text'))
+        zero_or_one = 0 if not text else 1  # Don't take up space if there's no text
+        w_max = "text" if text else 0  # But if there is space, fill the entire width of the block 
+        super().__init__(text=text,
+                         w_sizepref=SizePref(hard_min=zero_or_one, hard_max=w_max),
+                         h_sizepref=SizePref(hard_min=zero_or_one, hard_max=zero_or_one)
+        )
 
     def display(self, width, height, x, y, term=None):
         if not self.text:
@@ -35,7 +39,6 @@ class HFillBlock(Block):
 
         with self.write_lock:
             text = Line.repeat_to_width(self.text, width).display
-
             if term:
                 with term.location(x=x, y=y):
                     print(text.format(t=term), end='')
@@ -146,10 +149,10 @@ class FramedBlock(Block):
                  title = '',
                  title_sep = ''):
 
-        top_border = '' if no_borders and top_border == Block.MIDDLE_DOT else top_border
+        top_border = None if no_borders and top_border == Block.MIDDLE_DOT else top_border
         bottom_border = None if no_borders and bottom_border == Block.MIDDLE_DOT else bottom_border
-        left_border = '' if no_borders and left_border == Block.MIDDLE_DOT else left_border
-        right_border = '' if no_borders and right_border == Block.MIDDLE_DOT else right_border
+        left_border = None if no_borders and left_border == Block.MIDDLE_DOT else left_border
+        right_border = None if no_borders and right_border == Block.MIDDLE_DOT else right_border
 
         layout = [1,(2,3,4,5,6),7]
 

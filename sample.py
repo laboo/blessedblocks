@@ -95,7 +95,7 @@ blocks[1].text = ("{t.normal}A bare block with just a rg&b horizontal line\n" +
                   Line.repeat_to_width('{t.red}-{t.green}-{t.blue}-', r.term_width()).display)
 
 # Refresh some of the blocks in a tight loop
-for i in range(300):
+for i in range(100):
     if r.app_refresh_event.is_set():
         blocks[2].title = 'got event ' + str(i)
         r.app_refresh_event.clear()
