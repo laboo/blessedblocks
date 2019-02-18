@@ -5,8 +5,11 @@ import re
 class VFillBlock(Block):
     def __init__(self, text):
         border_text, seqs, last_seq = Line.parse(text)
-        super().__init__(text=text, w_sizepref=SizePref(hard_min=len(border_text),
-                                                        hard_max=len(border_text)))
+        super().__init__(text=text,
+                         w_sizepref=SizePref(hard_min=len(border_text),
+                                             hard_max=len(border_text)),
+                         h_sizepref=SizePref(hard_min=0,
+                                             hard_max=float('-inf')))
 
     def display(self, width, height, x, y, term=None):
         with self.write_lock:
@@ -25,9 +28,10 @@ class VFillBlock(Block):
 class HFillBlock(Block):
     def __init__(self, text):
         zero_or_one = 0 if not text else 1  # Don't take up space if there's no text
+        # TODO test the -inf and remove w_max
         w_max = "text" if text else 0  # But if there is space, fill the entire width of the block 
         super().__init__(text=text,
-                         w_sizepref=SizePref(hard_min=zero_or_one, hard_max=w_max),
+                         w_sizepref=SizePref(hard_min=zero_or_one, hard_max=float('-inf')),
                          h_sizepref=SizePref(hard_min=zero_or_one, hard_max=zero_or_one)
         )
 
@@ -162,12 +166,6 @@ class FramedBlock(Block):
         blocks[3] = BareBlock(text=title, hjust='^', vjust='^',
                               h_sizepref = SizePref(hard_min=1, hard_max=1))
         blocks[4] = HFillBlock(title_sep)
-        # Use the block's sizepref's for our own (we're just framing it),
-        # and assign the block the default size prefs, so the frame dominates.
-        w_sizepref = block.w_sizepref
-        h_sizepref = block.h_sizepref
-        block.w_sizepref = SizePref(hard_min=0, hard_max=float('inf'))
-        block.h_sizepref = SizePref(hard_min=0, hard_max=float('inf'))
         blocks[5] = block
         blocks[6] = HFillBlock(bottom_border)
         blocks[7] = VFillBlock(right_border)
@@ -176,8 +174,6 @@ class FramedBlock(Block):
                          hjust='^',
                          vjust='^',
                          block_just=True,
-                         w_sizepref=w_sizepref,
-                         h_sizepref=h_sizepref,
                          grid = Grid(layout, blocks))
         self.no_borders = no_borders
         self.top_border = top_border

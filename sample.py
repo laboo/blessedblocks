@@ -9,6 +9,8 @@ from blessedblocks.runner import Runner
 from threading import Event, Thread, Lock
 from tabulate import tabulate
 import datetime
+import shlex
+from subprocess import check_output
 
 # Some constants
 POUND = '#'
@@ -23,9 +25,16 @@ FILLER = ('01234}6789012345678901234567890123456789\n'
           '8123456789012345678901234567890123456789\n'
           '9123{t.blue}456789012345678901234567890123456789')
 
+def run_cmd_in_block(cmd, block, refresh=3.0):
+    while True:
+        data = check_output(shlex.split(cmd))
+        block.text = data.decode()
+        if stop_event.wait(refresh):
+            return
+
 # Specify the positioning of the blocks.
 # A list is horizontal, a tuple is vertical
-grid = [(4, [(1,2,3), (8,9), (5,[6,7])])]
+grid = [(4, [(1,2,3), (8,9), (5,[6,7])], 10)]
 
 # Build the contents of each of the blocks specified in the grid
 blocks = {}
@@ -38,7 +47,7 @@ blocks[2] = FramedBlock(BareBlock(FILLER, hjust='>'), # with a title, right just
 
 blocks[3] = FramedBlock(BareBlock(FILLER, vjust='v'),
                         no_borders=True,
-                        title='Block with no borders',
+                        title='FramedBlock with no borders',
                         title_sep='-')
 
 blocks[4] = BareBlock(str(datetime.datetime.now()), hjust='^', vjust='=',
@@ -62,12 +71,15 @@ table = [["Sun",696000,1989100000],["Earth",6371,5973.6],
 
 blocks[8] = FramedBlock(BareBlock(tabulate(table, headers=headers),
                                   hjust='^',
-                                  vjust='='),
+                                  vjust='=',
+                                  h_sizepref=SizePref(hard_min=0, hard_max='text')),
                         left_border='{t.blue}#',
                         right_border='{t.green}#',
                         top_border='{t.magenta}# ',
                         bottom_border='{t.green}#',
                         title='Tabulate hjust=^, vjust==', title_sep='-')
+
+
 
 # Create an embedded block with its own grid
 eblocks = {}
@@ -83,8 +95,12 @@ bb = BareBlock(None, grid=eg)
 
 blocks[9] = bb  # stick it in slot 9
 
+blocks[10] = BareBlock(text='top output', hjust='^', vjust='^',
+                       h_sizepref = SizePref(hard_min=1, hard_max=10))
+
 g = Grid(layout=grid, blocks=blocks)
 ba = BareBlock(None, grid=g)
+
 
 # Main logic
 stop_event = Event()
@@ -93,6 +109,11 @@ r.start()
 
 blocks[1].text = ("{t.normal}A bare block with just a rg&b horizontal line\n" +
                   Line.repeat_to_width('{t.red}-{t.green}-{t.blue}-', r.term_width()).display)
+
+# Start the top output in block 10
+top_thread = Thread(target=run_cmd_in_block,
+                    args=('top -b -n 1 -w 512', blocks[10], 1))
+top_thread.start()
 
 # Refresh some of the blocks in a tight loop
 for i in range(100):
@@ -116,4 +137,6 @@ for i in range(100):
     stop_event.wait(.1)
     blocks[4].text = 'bare_block ' + str(datetime.datetime.now())
 
+stop_event.set()
+top_thread.join()
 r.stop()

@@ -7,31 +7,37 @@ from time import sleep
 import signal
 import logging
 
-# A Plot is an object-oriented realization of the information the Grid object
-# inside the Runner's Block object (attribute).  We don't force the Block
-# developer to handle this complexity.
-# The Block developer is responsible only for the Grid: a map of numbers
+# A Plot is an object-oriented realization of the information contained in
+# the Grid object inside the Runner's Block object (attribute). We don't
+# force the Block developer to handle this complexity.
+#
+# Instead, the Block developer is responsible only for the Grid: a map of numbers
 # to blocks, and a layout. The layout is a recursive structure containing only
 # Python lists, tuples, and numbers. (for example [1, [(2,3), [4, 5]]]). The
 # digits signify leaf blocks (those not containing a Grid of blocks
 # embedded within it). _Lists_ inside the layout signify horizontal orientation
 # of the blocks it contains, and _tuples_, horizontal orientation. The problem with
-# this simple implementation of a layout -- just lists, tuple, and digits --
-# is that it's not possible (without subclassing, which doesn't work
-# well here) to hang metadata on the lists and tuples. We need that metadata to
-# know how to divvy up the space available to each of the leaf blocks within
-# the list or tuple, given the space available to the list or tuple as a whole.
-# This metadata is the SizePrefs each Block declares.
+# this simple implementation of a layout -- just lists, tuple, and digits for
+# the convenience of the Block developer -- is that it's not possible (without
+# subclassing, which doesn't work well here) to hang metadata on the lists and
+# tuples. We need that metadata to know how to divvy up the space available to
+# each of the leaf blocks within the list or tuple, given the space available to
+# the list or tuple as a whole. This metadata is the SizePrefs each Block declares.
 #
 # We use Plots to objectify the Grid as follows. A leaf Block gets wrapped
 # in a Plot object together with the block's own SizePrefs. A list or tuple in a
 # layout is built into a Plot object using the Blocks it contains, but its
-# SizePref's arg is calculated from the merging of the SizePrefs of those blocks.
+# SizePref's arg is calculated by the merging of the SizePrefs of those blocks.
 # This is the metadata referred to above.
-
+#
 # So, building a plot requires a recursive procedure. On the way down from the
-# outermost block, we build up a tree of Plots as we go. It's _on the way back up_,
-# though, that we calcuate SizePrefs for the Plots that represent lists or tuples.
+# outermost block, we build a tree of Plots as we go down. It's _on the way back
+# up_, though, that we calcuate SizePrefs for the Plots that represent lists
+# or tuples.
+#
+# Once the plot tree if fully built, the x and y coordinates and width and height
+# of each block have been produced, and each block can be passed that information
+# so that it can display itself.
 
 # Uncomment to debug deadlock problems
 #import stacktracer
@@ -39,8 +45,8 @@ import logging
 
 class Plot(object):
     def __init__(self,
-                 w_sizepref=SizePref(hard_min=0, hard_max=[]),
-                 h_sizepref=SizePref(hard_min=0, hard_max=[]),
+                 w_sizepref=SizePref(hard_min=[0], hard_max=[float('inf')]),
+                 h_sizepref=SizePref(hard_min=[0], hard_max=[float('inf')]),
                  horizontal=True,
                  subplots=None,
                  block = None):
@@ -51,9 +57,11 @@ class Plot(object):
         self.block = block
 
     def __repr__(self):
-        me ='[ z={} chld={} name={}'.format(self.horizontal,
-                                            len(self.subplots) if self.subplots else 0,
-                                            self.block.name if self.block else '')
+        me ='[ z={} chld={} wsp={}, hsp={}'.format(self.horizontal,
+                                                   len(self.subplots) if self.subplots else 0,
+                                                   self.w_sizepref,
+                                                   self.h_sizepref)
+
         if self.subplots:
             for subplot in self.subplots:
                 me = me + '\n\t' + repr(subplot)
@@ -171,76 +179,78 @@ class Runner(object):
             layout = self._block.grid._layout
             blocks = self._block.grid._slots
             self._root_plot = self.build_plot(layout, blocks)
-        #self.update_all()
 
 
-    # Gets called at Runner creation and at any time the Runner's Block
-    # changes. When it does, we need to rebuild the plot tree. Starting
-    # from the root Block, we recurse down all its embedded Blocks, creating
-    # a Plot to represent each level on the way.
+    # Gets called at Runner creation, when the terminal is resized, or any
+    # part of any block is changed. When any of those happen, we need to rebuild
+    # the plot tree. Starting from the root Block, we recurse down all its
+    # embedded Blocks, creating a Plot to represent each level on the way.
     # As we undo the recursion and travel back up the tree, at each level
     # we merge the SizePrefs of all the blocks at that level and store the
     # result in the Plot containing the blocks. When this completes, we can use the
-    # resulting plot tree to display the Runner's Block.
+    # resulting plot tree to display the top-most block, the Runner's Block.
     def build_plot(self, layout, blocks, horizontal=True):
-        def merge_sizeprefs(plots):
-            w_hard_min, w_hard_max, h_hard_min, h_hard_max = 0, [], 0, []
-            # Hard maxes merge only if *all* subplots have a hard_max set
-            # because if any subplot will take as much as it can, we want
-            # the (super)plot to claim as much space as it can. If all
-            # subplots have a hard_max specified, we know exactly the max
-            # space needed so we claim that.
-            num_w_hard_maxes, num_h_hard_maxes = 0, 0
+        def merge_sizeprefs(plots, horizontal):
+            # m_ stands for "main", s_ stands for "secondary"
+            # main is the width sizepref is the plot is horizontal, and
+            # the height size pref if it's vertical.
+            # The main sizepref is summed, the secondary maxed
+            # TODO document hard_max and the infinities values
+            m_hard_min, m_hard_max, s_hard_min, s_hard_max = [0], [], [0], []
             for plot in subplots:
-                w_hard_min += plot.w_sizepref.hard_min
-                if plot.w_sizepref.hard_max: num_w_hard_maxes += 1
-                w_hard_max += plot.w_sizepref.hard_max
-                h_hard_min += plot.h_sizepref.hard_min
-                if plot.h_sizepref.hard_max: num_h_hard_maxes += 1
-                h_hard_max += plot.h_sizepref.hard_max
-            # TODO max or sum?
-            w_hard_max = [sum(w_hard_max)] if num_w_hard_maxes == len(subplots) else []
-            h_hard_max = [sum(h_hard_max)] if num_h_hard_maxes == len(subplots) else []
-            w_sizepref = SizePref(hard_min=w_hard_min,
-                                  hard_max=w_hard_max)
-            h_sizepref = SizePref(hard_min=h_hard_min,
-                                  hard_max=h_hard_max)
-            return w_sizepref, h_sizepref
+                # Just combine arrays
+                m_sizepref = plot.w_sizepref if horizontal else plot.h_sizepref
+                m_hard_min += m_sizepref.hard_min
+                if m_sizepref.hard_max != float('-inf'):
+                    m_hard_max += m_sizepref.hard_max
+
+                s_sizepref = plot.h_sizepref if horizontal else plot.w_sizepref
+                s_hard_min += s_sizepref.hard_min
+                if s_sizepref.hard_max != float('-inf'):
+                    s_hard_max += s_sizepref.hard_max
+
+            # sum the main sizeprefs
+            m_hard_max = [sum(m_hard_max) if m_hard_max else None]
+            m_hard_min = [sum(m_hard_min)]
+            # max the secondary sizeprefs
+            s_hard_max = [max(s_hard_max) if s_hard_max else None]
+            s_hard_min = [max(s_hard_min)]
+
+            m_sizepref = SizePref(hard_min=m_hard_min, hard_max=m_hard_max) if m_hard_max else None
+            s_sizepref = SizePref(hard_min=s_hard_min, hard_max=s_hard_max) if s_hard_max else None
+
+            return (m_sizepref, s_sizepref) if horizontal else (s_sizepref, m_sizepref)
 
         subplots = []
         if not layout:
             for _, block in blocks.items():
-                # if there's no layout there's only one block.
+                # If there's no layout there's only one block.
                 # merge its sizeprefs (which contain numbers) into
                 # new sizeprefs containing lists. hard_max'es can
                 # contain either the string 'text' meaning 'the
                 # size of the amount of text you can fit in the
-                # plot, or they can contain a float, which is treated
+                # plot', or they can contain a float, which is treated
                 # as an int, but using float allows for infinity.
-                # TODO: how is 'text' different from float('inf')
-                # exactly? Don't they both mean use all space avail-
-                # able?
 
                 # handle w_sizepref
-                hard_max = []
                 if block.w_sizepref.hard_max == 'text':
                     hard_max = [block.num_text_cols]
-                elif block.w_sizepref.hard_max != float('inf'):
+                else:
                     hard_max = [block.w_sizepref.hard_max]
-                w_sizepref = SizePref(hard_min=block.w_sizepref.hard_min,
+                w_sizepref = SizePref(hard_min=[block.w_sizepref.hard_min],
                                       hard_max=hard_max)
 
                 # handle h_sizepref
-                hard_max = []
                 if block.h_sizepref.hard_max == 'text':
                     hard_max = [block.num_text_rows]
-                elif block.h_sizepref.hard_max != float('inf'):
+                else:
                     hard_max = [block.h_sizepref.hard_max]
-                h_sizepref = SizePref(hard_min=block.h_sizepref.hard_min,
+                h_sizepref = SizePref(hard_min=[block.h_sizepref.hard_min],
                                       hard_max=hard_max)
 
-                # This return is purposely *inside* the loop
-                # TODO why? because there's no layout?
+                # This return is purposely *inside* the loop because
+                # there's only one block, so we have all we need to
+                # build the plot.
                 return Plot(w_sizepref, h_sizepref, block=block)
         for element in layout:
             if type(element) == int:
@@ -255,7 +265,7 @@ class Runner(object):
                subplot = self.build_plot(element, blocks, orientation)
             subplots.append(subplot)
 
-        w_sizepref, h_sizepref = merge_sizeprefs(subplots)
+        w_sizepref, h_sizepref = merge_sizeprefs(subplots, horizontal)
         return Plot(w_sizepref, h_sizepref, horizontal=horizontal, subplots=subplots)
 
     # Display the plot by recursing down the plot tree built by
@@ -303,8 +313,8 @@ class Runner(object):
 
             if rem > 0:
                 # Reserve only the minimum space required
-                #amount = min(rem, prefs.hard_min)
-                amount = min(0, prefs.hard_min)
+                #amount = min(rem, prefs.hard_min)  # TODO use 0 instead of rem?
+                amount = min(rem, max(prefs.hard_min))
                 rem -= amount
                 memo[i][wh] += amount
             if prefs.hard_max:

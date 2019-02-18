@@ -124,12 +124,13 @@ class Block(object, metaclass=abc.ABCMeta):
         self.hjust = hjust
         self.vjust = vjust
         self.block_just = block_just
+        self.num_text_rows = 0
+        self.num_text_cols = 0
+        # num_text_rows and num_text_cols MUST be set before self.text is!
         self.text = text if text else None
         self.w_sizepref = w_sizepref
         self.h_sizepref = h_sizepref
         self.grid = grid
-        self.num_text_rows = 0
-        self.num_text_cols = 0
         self.dirty_event = None
         # Below here non-thread safe attrs: TODO (document or make thread-safe)
         self.prev_seq = ''
