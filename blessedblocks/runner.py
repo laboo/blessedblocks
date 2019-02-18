@@ -74,7 +74,6 @@ class Runner(object):
         self._block = block
         self._plot = Plot()
         self._refresh = Event()
-        self.app_refresh_event = Event()
         self._done = Event()
         self._term = Terminal()
         self._lock = RLock()

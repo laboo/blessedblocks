@@ -43,7 +43,8 @@ blocks[1] = BareBlock(None)
 
 blocks[2] = FramedBlock(BareBlock(FILLER, hjust='>'), # with a title, right justified
                         title='{t.cyan}Block {t.red}#2{t.normal}',
-                        title_sep='-')
+                        title_sep='-',
+                        top_border='x')
 
 blocks[3] = FramedBlock(BareBlock(FILLER, vjust='v'),
                         no_borders=True,
@@ -77,7 +78,7 @@ blocks[8] = FramedBlock(BareBlock(tabulate(table, headers=headers),
                         right_border='{t.green}#',
                         top_border='{t.magenta}# ',
                         bottom_border='{t.green}#',
-                        title='Tabulate hjust=^, vjust==', title_sep='-')
+                        title='hjust=^, vjust==, vhard_max="text"', title_sep='-')
 
 
 
@@ -117,9 +118,6 @@ top_thread.start()
 
 # Refresh some of the blocks in a tight loop
 for i in range(100):
-    if r.app_refresh_event.is_set():
-        blocks[2].title = 'got event ' + str(i)
-        r.app_refresh_event.clear()
     stop_event.wait(0.1)
     blocks[2].top_border = str(i%10)
     import random

@@ -1,3 +1,4 @@
+
 from .line import Line
 from .block import Block, SizePref, Grid, safe_get,safe_set
 import re
@@ -24,6 +25,17 @@ class VFillBlock(Block):
                     out.append(line.display)
             if not term:
                 return out
+    @property
+    @safe_get
+    def text(self): return self._text
+
+    @text.setter
+    @safe_set
+    def text(self, val):
+        border_text, seqs, last_seq = Line.parse(val)
+        Block.text.fset(self, val)
+        Block.w_sizepref.fset(self, SizePref(hard_min=len(border_text), hard_max=len(border_text)))
+
 
 class HFillBlock(Block):
     def __init__(self, text):
@@ -48,6 +60,18 @@ class HFillBlock(Block):
                     print(text.format(t=term), end='')
             else:
                 return [text]  # for testing purposes only
+
+    @property
+    @safe_get
+    def text(self): return self._text
+
+    @text.setter
+    @safe_set
+    def text(self, val):
+        zero_or_one = 0 if not val else 1  # Don't take up space if there's no text
+        Block.text.fset(self, val)
+        Block.w_sizepref.fset(self, SizePref(hard_min=zero_or_one, hard_max=float('-inf')))
+        Block.h_sizepref.fset(self, SizePref(hard_min=zero_or_one, hard_max=zero_or_one))
 
 class BareBlock(Block):
     def __init__(self,
@@ -136,13 +160,8 @@ class BareBlock(Block):
                 return [line.display for line in out]  # for testing purposes only
 
 class FramedBlock(Block):
-    LEFT_BORDER = 1
-    TOP_BORDER = 2
-    TITLE = 3
-    TITLE_SEP = 4
-    TEXT = 5
-    BOTTOM_BORDER = 6
-    RIGHT_BORDER = 7
+    LEFT_BORDER, TOP_BORDER, TITLE, TITLE_SEP, TEXT, BOTTOM_BORDER, RIGHT_BORDER = 1,2,3,4,5,6,7
+    layout = [1,(2,3,4,5,6),7]
     def __init__(self,
                  block,
                  no_borders=False,
@@ -158,28 +177,24 @@ class FramedBlock(Block):
         left_border = None if no_borders and left_border == Block.MIDDLE_DOT else left_border
         right_border = None if no_borders and right_border == Block.MIDDLE_DOT else right_border
 
-        layout = [1,(2,3,4,5,6),7]
+        self._blocks = {}
 
-        blocks = {}
-        blocks[1] = VFillBlock(left_border)
-        blocks[2] = HFillBlock(top_border)
-        blocks[3] = BareBlock(text=title, hjust='^', vjust='^',
-                              h_sizepref = SizePref(hard_min=1, hard_max=1))
-        blocks[4] = HFillBlock(title_sep)
-        blocks[5] = block
-        blocks[6] = HFillBlock(bottom_border)
-        blocks[7] = VFillBlock(right_border)
+        self._blocks[1] = VFillBlock(left_border)
+        self._blocks[2] = HFillBlock(top_border)
+        self._blocks[3] = BareBlock(text=title, hjust='^', vjust='^',
+                                   h_sizepref = SizePref(hard_min=1, hard_max=1))
+        self._blocks[4] = HFillBlock(title_sep)
+        self._blocks[5] = block
+        self._blocks[6] = HFillBlock(bottom_border)
+        self._blocks[7] = VFillBlock(right_border)
 
         super().__init__(None,
                          hjust='^',
                          vjust='^',
                          block_just=True,
-                         grid = Grid(layout, blocks))
+                         grid = Grid(FramedBlock.layout, self._blocks))
+
         self.no_borders = no_borders
-        self.top_border = top_border
-        self.bottom_border = bottom_border
-        self.left_border = left_border
-        self.right_border = right_border
 
     @property
     @safe_get
@@ -198,6 +213,8 @@ class FramedBlock(Block):
     @safe_set
     def top_border(self, val):
         self._top_border = val
+        top_border = None if self.no_borders and self.top_border == Block.MIDDLE_DOT else val
+        self._blocks[FramedBlock.TOP_BORDER].text = top_border
 
     @property
     @safe_get
@@ -207,6 +224,8 @@ class FramedBlock(Block):
     @safe_set
     def bottom_border(self, val):
         self._bottom_border = val
+        bottom_border = None if self.no_borders and self.bottom_border == Block.MIDDLE_DOT else val
+        self._blocks[FramedBlock.BOTTOM_BORDER].text = val
 
     @property
     @safe_get
@@ -216,6 +235,7 @@ class FramedBlock(Block):
     @safe_set
     def left_border(self, val):
         self._left_border = val
+        self._blocks[FramedBlock.LEFT_BORDER].text = val
 
     @property
     @safe_get
@@ -225,6 +245,27 @@ class FramedBlock(Block):
     @safe_set
     def right_border(self, val):
         self._right_border = val
+        self._blocks[FramedBlock.RIGHT_BORDER].text = val
+
+    @property
+    @safe_get
+    def title(self): return self._title
+
+    @title.setter
+    @safe_set
+    def title(self, val):
+        self._title = val
+        self._blocks[FramedBlock.TITLE].text = val
+
+    @property
+    @safe_get
+    def title_sep(self): return self._title_sep
+
+    @title_sep.setter
+    @safe_set
+    def title_sep(self, val):
+        self._title_sep = val
+        self._blocks[FramedBlock.TITLE_SEP].text = val
 
     def display(self, width, height, x, y, term=None):
         raise NotImplementedError("Blocks with grids don't implement display method")

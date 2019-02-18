@@ -93,7 +93,8 @@ def safe_set(method):
             method(self, *args, **kwargs)
         try:
             if self.dirty_event:
-                self.dirty_event.set()
+                if not self.dirty_event.is_set():
+                    self.dirty_event.set()
         except AttributeError:
             pass
     return _impl
