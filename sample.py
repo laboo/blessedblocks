@@ -116,11 +116,14 @@ top_thread = Thread(target=run_cmd_in_block,
                     args=('top -b -n 1 -w 512', blocks[10], 1))
 top_thread.start()
 
+import random
 # Refresh some of the blocks in a tight loop
 for i in range(100):
     stop_event.wait(0.1)
     blocks[2].top_border = str(i%10)
-    import random
+    if not i % 10:
+        blocks[2].bottom_border = random.choice(['{t.red}', '{t.while}', '{t.blue}']) + random.choice(['+', '=', '=', '%'])
+
     just = random.choice(['<', '^', '>'])
     block_just_block.hjust = just
     line_just_block.hjust = just
