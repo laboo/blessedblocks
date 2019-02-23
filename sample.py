@@ -39,7 +39,7 @@ grid = [(4, [(1,2,3), (8,9), (5,[6,7])], 10)]
 # Build the contents of each of the blocks specified in the grid
 blocks = {}
 
-blocks[1] = BareBlock(None)
+blocks[1] = BareBlock(None, h_sizepref=SizePref(hard_min=1, hard_max=1))
 
 blocks[2] = FramedBlock(BareBlock(FILLER, hjust='>'), # with a title, right justified
                         title='{t.cyan}Block {t.red}#2{t.normal}',
@@ -73,7 +73,7 @@ table = [["Sun",696000,1989100000],["Earth",6371,5973.6],
 blocks[8] = FramedBlock(BareBlock(tabulate(table, headers=headers),
                                   hjust='^',
                                   vjust='=',
-                                  h_sizepref=SizePref(hard_min=0, hard_max='text')),
+                                  h_sizepref=SizePref(hard_min='text', hard_max='text')),
                         left_border='{t.blue}#',
                         right_border='{t.green}#',
                         top_border='{t.magenta}# ',
@@ -93,7 +93,6 @@ eblocks[2] = FramedBlock(line_just_block, title='block_just=False', title_sep='-
 
 eg = Grid(layout=[(1,2)], blocks=eblocks)
 bb = BareBlock(None, grid=eg)
-
 blocks[9] = bb  # stick it in slot 9
 
 blocks[10] = BareBlock(text='top output', hjust='^', vjust='^',
@@ -118,7 +117,7 @@ top_thread.start()
 
 import random
 # Refresh some of the blocks in a tight loop
-for i in range(100):
+for i in range(300):
     stop_event.wait(0.1)
     blocks[2].top_border = str(i%10)
     if not i % 10:

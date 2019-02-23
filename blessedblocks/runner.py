@@ -232,20 +232,16 @@ class Runner(object):
                 # as an int, but using float allows for infinity.
 
                 # handle w_sizepref
-                if block.w_sizepref.hard_max == 'text':
-                    hard_max = [block.num_text_cols]
-                else:
-                    hard_max = [block.w_sizepref.hard_max]
-                w_sizepref = SizePref(hard_min=[block.w_sizepref.hard_min],
-                                      hard_max=hard_max)
+                hard_min, hard_max = [block.w_sizepref.hard_min], [block.w_sizepref.hard_max]
+                if block.w_sizepref.hard_min == 'text': hard_min = [block.num_text_cols]
+                if block.w_sizepref.hard_max == 'text': hard_max = [block.num_text_cols]
+                w_sizepref = SizePref(hard_min=hard_min, hard_max=hard_max)
 
                 # handle h_sizepref
-                if block.h_sizepref.hard_max == 'text':
-                    hard_max = [block.num_text_rows]
-                else:
-                    hard_max = [block.h_sizepref.hard_max]
-                h_sizepref = SizePref(hard_min=[block.h_sizepref.hard_min],
-                                      hard_max=hard_max)
+                hard_min, hard_max = [block.h_sizepref.hard_min], [block.h_sizepref.hard_max]
+                if block.h_sizepref.hard_min == 'text': hard_min = [block.num_text_rows]
+                if block.h_sizepref.hard_max == 'text': hard_max = [block.num_text_rows]
+                h_sizepref = SizePref(hard_min=hard_min, hard_max=hard_max)
 
                 # This return is purposely *inside* the loop because
                 # there's only one block, so we have all we need to
@@ -312,8 +308,7 @@ class Runner(object):
 
             if rem > 0:
                 # Reserve only the minimum space required
-                #amount = min(rem, prefs.hard_min)  # TODO use 0 instead of rem?
-                amount = min(rem, max(prefs.hard_min))
+                amount = min(rem, sum(prefs.hard_min))
                 rem -= amount
                 memo[i][wh] += amount
             if prefs.hard_max:
