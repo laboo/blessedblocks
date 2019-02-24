@@ -12,8 +12,11 @@ do both. Thus, Blocks are nodes in a tree, and only terminal nodes can be displa
 A Grid specifies how its Block is broken up into rectangular slots, each of which
 can hold one other Block, and then assigns a Block to the each of the slots.
 
-A SizePref if a declaration of the Block's demands and requests when placed into a
-Grid with other Blocks.
+A SizePref is a declaration of the Block's demands and requests when placed into a
+Grid with other Blocks. These are recommendations only, which are satisfied when
+possible, but unsatisfied sometimes, but always fairly across all blocks. To be
+completely accurate, the SizePref does not pertain to the entire grid, but rather
+only the row or column of blocks the given block sits in.
 
 Blocks (mutable) and SizePrefs (immutable) are thread-safe, Grids are not.
 Grid modifications should be done by replacing a Grid with another.
@@ -26,6 +29,10 @@ Block when started, and again every time any Block changes, or a periodic timer 
 
 SizePref = namedtuple('SizePref', 'hard_min hard_max')
 
+# This default SizePref is maximally cooperative. It will take as much space as you can give
+# it (hard_max=float('inf'), ie, no hard max), but if space is at a premium give it to
+# other blocks over me if they are requesting it (hard_min=0, ie, no minimum).
+DEFAULT_SIZE_PREF = SizePref(hard_min=0, hard_max=float('inf'))
 class Grid(object):
     def __init__(self, layout=None, blocks=None):
         if (layout or blocks) and not (layout and blocks):
@@ -82,8 +89,8 @@ class Grid(object):
 
 '''
 These two wrappers add convenience for keeping the Block thread-safe.
-The safe_set function notifies the Grid, if the block is contained
-within one, that the block has changed.
+The safe_set function notifies the Grid that the block is contain in
+that the block has changed.
 '''
 from functools import wraps
 def safe_set(method):
@@ -116,10 +123,9 @@ class Block(object, metaclass=abc.ABCMeta):
                  vjust='^',  # vertically centered within block
                  block_just=True,  # justify block as a whole vs line-by-line
                  # The SizePrefs indicate how much screen real estate (width and height) this
-                 # block desires/requires when displayed. Here, we default the block to
-                 # as-much-as-you-got-but-none-is-fine.
-                 w_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
-                 h_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
+                 # block desires/requires when displayed.
+                 w_sizepref = None,
+                 h_sizepref = None,
                  grid=None):
         self.write_lock = RLock()
         self.hjust = hjust

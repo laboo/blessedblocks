@@ -2,7 +2,7 @@
 import os, sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "blessedblocks"))
 # Previous two lines not needed if blessedblocks modules is installed
-from blessedblocks.block import Block, Grid, SizePref
+from blessedblocks.block import Block, Grid, SizePref, DEFAULT_SIZE_PREF
 from blessedblocks.blocks import BareBlock, FramedBlock
 from blessedblocks.line import Line
 from blessedblocks.runner import Runner
@@ -34,9 +34,9 @@ def run_cmd_in_block(cmd, block, refresh=3.0):
 
 # Specify the positioning of the blocks.
 # A list is horizontal, a tuple is vertical
-grid = [(4, [(1,2,3), (8,9), (5,[6,7])], 10)]
+layout = [(4, [(1,2,3), (8,9), (5,[6,7])], 10)]
 
-# Build the contents of each of the blocks specified in the grid
+# Build the contents of each of the blocks specified in the layout
 blocks = {}
 
 blocks[1] = BareBlock(None, h_sizepref=SizePref(hard_min=1, hard_max=1))
@@ -52,7 +52,7 @@ blocks[3] = FramedBlock(BareBlock(FILLER, vjust='v'),
                         title_sep='-')
 
 blocks[4] = BareBlock(str(datetime.datetime.now()), hjust='^', vjust='=',
-                      h_sizepref = SizePref(hard_min=0, hard_max=1))
+                      h_sizepref = SizePref(hard_min=1, hard_max=1))
 
 blocks[5] = FramedBlock(BareBlock(FILLER,
                                   h_sizepref = SizePref(hard_min=0, hard_max='text')),
@@ -92,13 +92,13 @@ eblocks[1] = FramedBlock(block_just_block, title='block_just=True', title_sep='-
 eblocks[2] = FramedBlock(line_just_block, title='block_just=False', title_sep='-')
 
 eg = Grid(layout=[(1,2)], blocks=eblocks)
-bb = BareBlock(None, grid=eg)
+bb = BareBlock(None, grid=eg, h_sizepref=DEFAULT_SIZE_PREF)
 blocks[9] = bb  # stick it in slot 9
 
 blocks[10] = BareBlock(text='top output', hjust='^', vjust='^',
-                       h_sizepref = SizePref(hard_min=1, hard_max=10))
+                       h_sizepref = SizePref(hard_min=7, hard_max=10))
 
-g = Grid(layout=grid, blocks=blocks)
+g = Grid(layout=layout, blocks=blocks)
 ba = BareBlock(None, grid=g)
 
 

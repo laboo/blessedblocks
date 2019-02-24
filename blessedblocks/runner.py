@@ -12,32 +12,34 @@ import logging
 # force the Block developer to handle this complexity.
 #
 # Instead, the Block developer is responsible only for the Grid: a map of numbers
-# to blocks, and a layout. The layout is a recursive structure containing only
-# Python lists, tuples, and numbers. (for example [1, [(2,3), [4, 5]]]). The
-# digits signify leaf blocks (those not containing a Grid of blocks
-# embedded within it). _Lists_ inside the layout signify horizontal orientation
-# of the blocks it contains, and _tuples_, horizontal orientation. The problem with
-# this simple implementation of a layout -- just lists, tuple, and digits for
-# the convenience of the Block developer -- is that it's not possible (without
-# subclassing, which doesn't work well here) to hang metadata on the lists and
-# tuples. We need that metadata to know how to divvy up the space available to
-# each of the leaf blocks within the list or tuple, given the space available to
-# the list or tuple as a whole. This metadata is the SizePrefs each Block declares.
+# to blocks, and a layout containing some or all of the (number) keys in the map.
+# The layout is a recursive structure containing only Python lists, tuples, and
+# numbers. (For example: [1, [(2,3), [4, 5]]] ). The digits signify leaf blocks
+# (those not containing a Grid of blocks embedded within it). _Lists_ inside the
+# layout signify horizontal orientation of the blocks it contains, and _tuples_,
+# horizontal orientation. The problem with this simple specification of a layout --
+# just lists, tuple, and digits for the convenience of the Block developer --
+# is that it's not possible (without subclassing, which doesn't work well here)
+# to hang metadata on the lists and tuples. We need that metadata to know how to
+# divvy up the space available to each of the leaf blocks within the list or tuple,
+# given the space available to the list or tuple as a whole. This metadata is the
+# SizePrefs each Block declares.
 #
 # We use Plots to objectify the Grid as follows. A leaf Block gets wrapped
-# in a Plot object together with the block's own SizePrefs. A list or tuple in a
-# layout is built into a Plot object using the Blocks it contains, but its
-# SizePref's arg is calculated by the merging of the SizePrefs of those blocks.
-# This is the metadata referred to above.
+# in a Plot object together with the block's own SizePrefs, or the default ones
+# if it doesn't have any specified. A list or tuple in a layout is built into a
+# Plot object using the Blocks it contains, but its SizePref's arg is calculated
+# by the merging of the SizePrefs of those blocks. This is the metadata referred
+# to above.
 #
-# So, building a plot requires a recursive procedure. On the way down from the
+# So, building a Plot requires a recursive procedure. On the way down from the
 # outermost block, we build a tree of Plots as we go down. It's _on the way back
 # up_, though, that we calcuate SizePrefs for the Plots that represent lists
 # or tuples.
 #
-# Once the plot tree if fully built, the x and y coordinates and width and height
-# of each block have been produced, and each block can be passed that information
-# so that it can display itself.
+# Once the plot tree is fully built, the x and y coordinates and width and height
+# of each block have been produced, and each block can be passed that information,
+# which it uses to display itself.
 
 # Uncomment to debug deadlock problems
 #import stacktracer
@@ -45,8 +47,8 @@ import logging
 
 class Plot(object):
     def __init__(self,
-                 w_sizepref=SizePref(hard_min=[0], hard_max=[float('inf')]),
-                 h_sizepref=SizePref(hard_min=[0], hard_max=[float('inf')]),
+                 w_sizepref=None,
+                 h_sizepref=None,
                  horizontal=True,
                  subplots=None,
                  block = None):
@@ -78,7 +80,6 @@ class Runner(object):
         self._term = Terminal()
         self._lock = RLock()
         self._stop_event = stop_event
-        self._not_just_dirty = Event()
         self._root_plot = None
         self.load(self._block.grid)
 
@@ -97,7 +98,6 @@ class Runner(object):
         self.stop()
 
     def update_all(self):
-        self._not_just_dirty.set()
         if not self._refresh.is_set():
             self._refresh.set()
 
@@ -141,14 +141,9 @@ class Runner(object):
                         if not self._refresh.wait(.5):
                             continue
                         with self._lock:
-                            if self._not_just_dirty.is_set():
-                                #just_dirty = False
-                                self._not_just_dirty.clear()
-                                #else:
-                                #just_dirty = True
                             self.load(self._block.grid)
                             self.display_plot(self._root_plot,
-                                              0, 0,                                   # x, y
+                                              0, 0,                                 # x, y
                                               self._term.width, self._term.height,  # w, h
                                               self._term)
                             self._refresh.clear()
@@ -224,24 +219,35 @@ class Runner(object):
         if not layout:
             for _, block in blocks.items():
                 # If there's no layout there's only one block.
+
+                # If the blocks contains SizePrefs we use those. In other words,
+                # specified SizePrefs override those being calculated as we move
+                # up the Plot tree.
+
+                # handle w_sizepref
+                if not block.w_sizepref:
+                    w_sizepref = Block.DEFAULT_SIZE_PREF
+
                 # merge its sizeprefs (which contain numbers) into
                 # new sizeprefs containing lists. hard_max'es can
                 # contain either the string 'text' meaning 'the
                 # size of the amount of text you can fit in the
                 # plot', or they can contain a float, which is treated
                 # as an int, but using float allows for infinity.
-
-                # handle w_sizepref
-                hard_min, hard_max = [block.w_sizepref.hard_min], [block.w_sizepref.hard_max]
-                if block.w_sizepref.hard_min == 'text': hard_min = [block.num_text_cols]
-                if block.w_sizepref.hard_max == 'text': hard_max = [block.num_text_cols]
-                w_sizepref = SizePref(hard_min=hard_min, hard_max=hard_max)
+                else:
+                    hard_min, hard_max = [block.w_sizepref.hard_min], [block.w_sizepref.hard_max]
+                    if block.w_sizepref.hard_min == 'text': hard_min = [block.num_text_cols]
+                    if block.w_sizepref.hard_max == 'text': hard_max = [block.num_text_cols]
+                    w_sizepref = SizePref(hard_min=hard_min, hard_max=hard_max)
 
                 # handle h_sizepref
-                hard_min, hard_max = [block.h_sizepref.hard_min], [block.h_sizepref.hard_max]
-                if block.h_sizepref.hard_min == 'text': hard_min = [block.num_text_rows]
-                if block.h_sizepref.hard_max == 'text': hard_max = [block.num_text_rows]
-                h_sizepref = SizePref(hard_min=hard_min, hard_max=hard_max)
+                if not block.h_sizepref:
+                    h_sizepref = Block.DEFAULT_SIZE_PREF
+                else:
+                    hard_min, hard_max = [block.h_sizepref.hard_min], [block.h_sizepref.hard_max]
+                    if block.h_sizepref.hard_min == 'text': hard_min = [block.num_text_rows]
+                    if block.h_sizepref.hard_max == 'text': hard_max = [block.num_text_rows]
+                    h_sizepref = SizePref(hard_min=hard_min, hard_max=hard_max)
 
                 # This return is purposely *inside* the loop because
                 # there's only one block, so we have all we need to
@@ -266,12 +272,12 @@ class Runner(object):
     # Display the plot by recursing down the plot tree built by
     # build_plot() and determine the coordinates for the plots embedded in
     # each plot by using the SizePrefs of the plots
-    def display_plot(self, plot, x, y, w, h, term=None, just_dirty=True):
+    def display_plot(self, plot, x, y, w, h, term=None):
         if plot.block:
             plot.block.display(w, h, x, y, term)
         else:
             for subplot, new_x, new_y, new_w, new_h in Runner.divvy(plot.subplots, x, y, w, h, plot.horizontal):
-                self.display_plot(subplot, new_x, new_y, new_w, new_h, term, just_dirty)
+                self.display_plot(subplot, new_x, new_y, new_w, new_h, term)
 
     # Divvy up the space available to a series of plots among them
     # by referring to SizePrefs for each.
@@ -289,11 +295,6 @@ class Runner(object):
         # The main complications in divvying up the available space for the
         # plots are in satisfying the hard_min and hard_max preferences for
         # each plot.
-        # - hard_mins are relatively easy. A hard_min is a single value -- the
-        # sum of all min for all this plot's subplots. We just reserve the
-        # hard_min if it's available, and that's it.
-        # - hard_maxes are harder. A hard_max value is an array of all hard_max
-        # values for this plot's subplots.
 
         # handle hard_min first, but save off hard_maxes
         rem = w if horizontal else h  # remaining space to divvy
