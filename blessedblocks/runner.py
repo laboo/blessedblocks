@@ -1,8 +1,10 @@
 from __future__ import print_function
 from blessed import Terminal
-from .block import Block, Grid, SizePref
+from .block import Block, Grid, SizePref, DEFAULT_SIZE_PREF
+from .debug import debug_q
 from math import floor, ceil
 from threading import Event, Thread, RLock, current_thread
+from queue import Queue
 from time import sleep
 import signal
 import logging
@@ -45,6 +47,7 @@ import logging
 #import stacktracer
 #stacktracer.trace_start("/tmp/trace.html",interval=2,auto=True)
 
+
 class Plot(object):
     def __init__(self,
                  w_sizepref=None,
@@ -71,16 +74,18 @@ class Plot(object):
         return me
 
 class Runner(object):
-    def __init__(self, block, stop_event=None):
+
+    def __init__(self, block, stop_event=None, cmds=None):
 
         self._block = block
         self._plot = Plot()
-        self._refresh = Event()
         self._done = Event()
         self._term = Terminal()
         self._lock = RLock()
         self._stop_event = stop_event
+        self._cmds = cmds
         self._root_plot = None
+        self.rebuild_plot_q = Queue()
         self.load(self._block.grid)
 
     def __repr__(self):
@@ -98,8 +103,8 @@ class Runner(object):
         self.stop()
 
     def update_all(self):
-        if not self._refresh.is_set():
-            self._refresh.set()
+        if self.rebuild_plot_q.empty():
+            self.rebuild_plot_q.put('')  # '' is empty cmd
 
     def _on_resize(self, *args):
         self.update_all()
@@ -112,41 +117,87 @@ class Runner(object):
             args=()
         )
 
+        if self._cmds:
+            self._io_thread = Thread(name='io', target=self._read_cmd, args=())
+
         signal.signal(signal.SIGWINCH, self._on_resize)
         signal.signal(signal.SIGINT, self._on_kill)
 
+        if self._cmds:
+            self._io_thread.start()
         self._thread.start()
 
     def stop(self, *args):
         self._term.clear()
         if not self._done.is_set():
             self._done.set()
-            self._refresh.set() # in order to release it from a wait()
+            self.rebuild_plot_q.put('')  # '' is empty cmd
 
             if (self._thread and self._thread.isAlive() and
                 self._thread.name != current_thread().name):
                 self._thread.join()
+            if (self._io_thread and self._io_thread.isAlive() and
+                self._io_thread.name != current_thread().name):
+                self._io_thread.join()
 
     def done(self):
         return not self._thread.isAlive() or self._done.is_set()
 
+    def _read_cmd(self):
+        PROMPT = ''
+        with self._term.cbreak():
+            if 'input' not in self._block.grid._names:
+                return
+            input_block = self._block.grid._names['input']
+            input_block.text = PROMPT
+            while True:
+                val = self._term.inkey(timeout=.5)
+
+                if not val:  # timeout
+                    if self._done.is_set():
+                        break
+                elif val.is_sequence:
+                    if val.name == 'KEY_ENTER':
+                        # if not cmd: ??? maybe refresh something? or redo previous?
+                        if input_block.text in self._cmds:
+                            self.rebuild_plot_q.put(input_block.text)
+                        else:
+                            pass  # TODO command not recognized
+                        input_block.text = PROMPT
+                    elif val.name == 'KEY_DELETE':
+                        input_block.text = input_block.text[:-1]
+                    elif val.name == 'KEY_ESCAPE':
+                        pass  # hmmmm
+                    else:
+                        # TODO ignore?
+                        input_block.text = PROMPT
+                else:
+                    if not val.isalnum():
+                        if ord(val) == 4:  # ctl-d
+                            input_block.text = PROMPT
+                        if ord(val) == 32: # space
+                            input_block.text += Block.MIDDLE_DOT
+                    elif not input_block.text and val in self._cmds:  # Handles one-char-no-return commands
+                        #print('got single cmd', self._block.text)  # TODO place on cmd q
+                        self.rebuild_plot_q.put(val)
+                    else:
+                        input_block.text += val
+
     def _run(self):
-        self._refresh.set() # show at start once without an event triggering
+        self.rebuild_plot_q.put('')  # show at start once
         with self._term.fullscreen():
             with self._term.hidden_cursor():
                 try:
                     while True:
                         if self._done.is_set():
                             break
-                        if not self._refresh.wait(.5):
-                            continue
+
                         with self._lock:
                             self.load(self._block.grid)
                             self.display_plot(self._root_plot,
                                               0, 0,                                 # x, y
                                               self._term.width, self._term.height,  # w, h
                                               self._term)
-                            self._refresh.clear()
                 except Exception as e:
                     debug = True
                     if debug:
@@ -156,20 +207,20 @@ class Runner(object):
                     # TODO. This doesn't successfully stop the application
 
     def update(self):
-        if not self._refresh.is_set():
-            self._refresh.set()
+        if self.rebuild_plot_q.empty():
+            self.rebuild_plot_q.put('')  # '' is empty cmd
 
     def update_block(self, index, block):
         with self._lock:
             self._block.grid._slots[index] = block
-            block.dirty_event = self._refresh
+            block.dirty_event_q = self.rebuild_plot_q
         self.update()
 
     def load(self, grid):
         with self._lock:
             self._block.grid = grid
             for _, block in self._block.grid._slots.items():
-                block.dirty_event = self._refresh
+                block.dirty_event_q = self.rebuild_plot_q
             layout = self._block.grid._layout
             blocks = self._block.grid._slots
             self._root_plot = self.build_plot(layout, blocks)
@@ -215,6 +266,10 @@ class Runner(object):
 
             return (m_sizepref, s_sizepref) if horizontal else (s_sizepref, m_sizepref)
 
+        while not self.rebuild_plot_q.empty():
+            cmd = self.rebuild_plot_q.get()
+            if cmd:
+                raise ValueError(cmd)
         subplots = []
         if not layout:
             for _, block in blocks.items():
@@ -226,7 +281,7 @@ class Runner(object):
 
                 # handle w_sizepref
                 if not block.w_sizepref:
-                    w_sizepref = Block.DEFAULT_SIZE_PREF
+                    w_sizepref = DEFAULT_SIZE_PREF
 
                 # merge its sizeprefs (which contain numbers) into
                 # new sizeprefs containing lists. hard_max'es can
@@ -242,7 +297,7 @@ class Runner(object):
 
                 # handle h_sizepref
                 if not block.h_sizepref:
-                    h_sizepref = Block.DEFAULT_SIZE_PREF
+                    h_sizepref = DEFAULT_SIZE_PREF
                 else:
                     hard_min, hard_max = [block.h_sizepref.hard_min], [block.h_sizepref.hard_max]
                     if block.h_sizepref.hard_min == 'text': hard_min = [block.num_text_rows]

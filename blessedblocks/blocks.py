@@ -1,12 +1,37 @@
-
 from .line import Line
 from .block import Block, SizePref, Grid, safe_get,safe_set
+from threading import Thread
 import re
 
+class InputBlock(Block):
+    def __init__(self, name=None, grid=None):
+        super().__init__(name,
+                         text='> ',
+                         hjust='<',
+                         vjust='^',
+                         grid=grid)
+        # TODO when wrapping is supported, wrap this text
+        self.w_sizepref = SizePref(hard_min=0, hard_max=float('inf'))
+        self.h_sizepref = SizePref(hard_min=2, hard_max=2)  # both == 'text' if wrapping
+        self.default_status = 'Type h for help'
+        self.status = self.default_status
+
+    def display(self, width, height, x, y, term=None):
+        with self.write_lock:
+            if term:
+                with term.location(x=x, y=y):
+                    line = '> ' + self.text
+                    print(line + (' ' * (width-len(line))), end='')
+                with term.location(x=x, y=y+1):
+                    print(("{t.red}" + self.status).format(t=term), end='')
+            else:
+                return [self.text]  # for testing purposes only
+
 class VFillBlock(Block):
-    def __init__(self, text):
+    def __init__(self, text, name=None):
         border_text, seqs, last_seq = Line.parse(text)
-        super().__init__(text=text,
+        super().__init__(name=name,
+                         text=text,
                          w_sizepref=SizePref(hard_min=len(border_text),
                                              hard_max=len(border_text)),
                          h_sizepref=SizePref(hard_min=0,
@@ -38,11 +63,12 @@ class VFillBlock(Block):
 
 
 class HFillBlock(Block):
-    def __init__(self, text):
+    def __init__(self, text, name=None):
         zero_or_one = 0 if not text else 1  # Don't take up space if there's no text
         # TODO test the -inf and remove w_max
         w_max = "text" if text else 0  # But if there is space, fill the entire width of the block 
-        super().__init__(text=text,
+        super().__init__(name=name,
+                         text=text,
                          w_sizepref=SizePref(hard_min=zero_or_one, hard_max=float('-inf')),
                          h_sizepref=SizePref(hard_min=zero_or_one, hard_max=zero_or_one)
         )
@@ -75,6 +101,7 @@ class HFillBlock(Block):
 
 class BareBlock(Block):
     def __init__(self,
+                 name=None,
                  text=None,
                  hjust='<',  # horizontally left-justified within block
                  vjust='^',  # vertically centered within block
@@ -85,7 +112,7 @@ class BareBlock(Block):
                  w_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
                  h_sizepref = SizePref(hard_min=0, hard_max=float('inf')),
                  grid=None):
-        super().__init__(text=text, hjust=hjust, vjust=vjust, block_just=block_just,
+        super().__init__(name=name, text=text, hjust=hjust, vjust=vjust, block_just=block_just,
                          w_sizepref=w_sizepref, h_sizepref=h_sizepref, grid=grid)
         self._prev_seq = '{t.normal}'
 
@@ -164,6 +191,7 @@ class FramedBlock(Block):
     layout = [1,(2,3,4,5,6),7]
     def __init__(self,
                  block,
+                 name=None,
                  no_borders=False,
                  top_border=Block.MIDDLE_DOT,
                  bottom_border=Block.MIDDLE_DOT,
@@ -188,7 +216,8 @@ class FramedBlock(Block):
         self._blocks[6] = HFillBlock(bottom_border)
         self._blocks[7] = VFillBlock(right_border)
 
-        super().__init__(None,
+        super().__init__(name=name,
+                         text=None,
                          hjust='^',
                          vjust='^',
                          block_just=True,

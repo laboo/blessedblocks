@@ -38,7 +38,8 @@ class Grid(object):
         if (layout or blocks) and not (layout and blocks):
             raise ValueError('Grid arguments must both exist or both not exist.')
         self.write_lock = RLock()
-        self._slots = {}
+        self._slots = {}  # ints to blocks
+        self._names = {}  # names to blocks
         self._layout = layout if layout else []
         self._index = 0
         self._load(self._layout, blocks)
@@ -50,7 +51,13 @@ class Grid(object):
                     if element in self._slots:
                         raise ValueError('numbers embedded in grid must not have duplicates')
                     self._index = max(self._index, element) + 1
-                    self._slots[element] = blocks[element] if blocks and element in blocks else None
+                    if blocks and element in blocks:
+                        self._slots[element] = blocks[element]
+                        name = blocks[element].name if blocks[element].name else str(element)
+                        self._names[name] = blocks[element]
+                    else:
+                        self._slots[element] = None
+                        self._names[element] = None
                 elif type(element) in (list, tuple):
                     if len(element) == 0:
                         raise ValueError('lists and tuples embedded in grid must not be empty')
@@ -99,9 +106,9 @@ def safe_set(method):
         with self.write_lock:
             method(self, *args, **kwargs)
         try:
-            if self.dirty_event:
-                if not self.dirty_event.is_set():
-                    self.dirty_event.set()
+            if self.dirty_event_q:
+                if self.dirty_event_q.empty():
+                    self.dirty_event_q.put('')
         except AttributeError:
             pass
     return _impl
@@ -118,6 +125,7 @@ class Block(object, metaclass=abc.ABCMeta):
     MIDDLE_DOT = u'\u00b7'
 
     def __init__(self,
+                 name=None, # must be unique among blocks in a grid
                  text=None,
                  hjust='<',  # horizontally left-justified within block
                  vjust='^',  # vertically centered within block
@@ -127,6 +135,7 @@ class Block(object, metaclass=abc.ABCMeta):
                  w_sizepref = None,
                  h_sizepref = None,
                  grid=None):
+        self.name = name
         self.write_lock = RLock()
         self.hjust = hjust
         self.vjust = vjust
@@ -137,19 +146,15 @@ class Block(object, metaclass=abc.ABCMeta):
         self.text = text if text else None
         self.w_sizepref = w_sizepref
         self.h_sizepref = h_sizepref
+        self.dirty_event_q = None
         self.grid = grid
-        self.dirty_event = None
         # Below here non-thread safe attrs: TODO (document or make thread-safe)
         self.prev_seq = ''
 
-    ''' TODO: Figure this out
+
     def __repr__(self):
-        return ('<Block {{name={0}, title={1}, len(text)={2}, lines={3}}}>'
-                .format(self.name,
-                        self.title.plain,
-                        len(self.text) if self.text else 0,
-                        len(self.text.split('\n')) if self.text else 0))
-    '''
+        return ('<Block {{name={0}}}>'
+                .format(self.name))
 
     @abc.abstractmethod
     def display(self, width, height, x, y, term=None):
@@ -179,20 +184,13 @@ class Block(object, metaclass=abc.ABCMeta):
                 self._text = val
 
             try:
-                if self.dirty_event:
-                    self.dirty_event.set()
+                if self.dirty_event_q:
+                    if self.dirty_event_q.empty():
+                        self.dirty_event_q.put('')
             except AttributeError:
                 pass
         else:
             self._text = ''
-
-    @property
-    @safe_get
-    def dirty_event(self): return self._dirty_event
-
-    @dirty_event.setter
-    @safe_set
-    def dirty_event(self, val): self._dirty_event = val
 
     @property
     @safe_get

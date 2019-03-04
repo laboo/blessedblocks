@@ -3,9 +3,10 @@ import os, sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "blessedblocks"))
 # Previous two lines not needed if blessedblocks modules is installed
 from blessedblocks.block import Block, Grid, SizePref, DEFAULT_SIZE_PREF
-from blessedblocks.blocks import BareBlock, FramedBlock
+from blessedblocks.blocks import BareBlock, FramedBlock, InputBlock
 from blessedblocks.line import Line
 from blessedblocks.runner import Runner
+from blessedblocks.debug import DebugBlock
 from threading import Event, Thread, Lock
 from tabulate import tabulate
 import datetime
@@ -34,43 +35,44 @@ def run_cmd_in_block(cmd, block, refresh=3.0):
 
 # Specify the positioning of the blocks.
 # A list is horizontal, a tuple is vertical
-layout = [(4, [(1,2,3), (8,9), (5,[6,7])], 10)]
+layout = [(4, [(1,2,3), (8,9), (5,[6,7])], 10, 12)]
 
 # Build the contents of each of the blocks specified in the layout
 blocks = {}
+#blocks[11] = DebugBlock(name='debug')
 
-blocks[1] = BareBlock(None, h_sizepref=SizePref(hard_min=1, hard_max=1))
+blocks[1] = BareBlock(h_sizepref=SizePref(hard_min=1, hard_max=1))
 
-blocks[2] = FramedBlock(BareBlock(FILLER, hjust='>'), # with a title, right justified
+blocks[2] = FramedBlock(BareBlock(text=FILLER, hjust='>'), # with a title, right justified
                         title='{t.cyan}Block {t.red}#2{t.normal}',
                         title_sep='-',
                         top_border='x')
 
-blocks[3] = FramedBlock(BareBlock(FILLER, vjust='v'),
+blocks[3] = FramedBlock(BareBlock(text=FILLER, vjust='v'),
                         no_borders=True,
                         title='FramedBlock with no borders',
                         title_sep='-')
 
-blocks[4] = BareBlock(str(datetime.datetime.now()), hjust='^', vjust='=',
+blocks[4] = BareBlock(name='dt', text=str(datetime.datetime.now()), hjust='^', vjust='=',
                       h_sizepref = SizePref(hard_min=1, hard_max=1))
 
-blocks[5] = FramedBlock(BareBlock(FILLER,
+blocks[5] = FramedBlock(BareBlock(text=FILLER,
                                   h_sizepref = SizePref(hard_min=0, hard_max='text')),
                         title='Block #5',
                         title_sep='-')
 
-blocks[6] = FramedBlock(BareBlock(tabulate([['col1', 'col2'], [1.23, 2.456]]), # text at bottom of block
+blocks[6] = FramedBlock(BareBlock(text=tabulate([['col1', 'col2'], [1.23, 2.456]]), # text at bottom of block
                                   hjust='^'),
                         title="tabulate block hjust=^",
                         title_sep='-')
 
-blocks[7] = FramedBlock(BareBlock(FILLER),title='Block #7',title_sep='-')
+blocks[7] = FramedBlock(BareBlock(text=FILLER),title='Block #7',title_sep='-')
 
 headers=["Planet","R (km)", "mass (x 10^29 kg)"]
 table = [["Sun",696000,1989100000],["Earth",6371,5973.6],
          ["Moon",1737,73.5],["Mars",3390,641.85]]
 
-blocks[8] = FramedBlock(BareBlock(tabulate(table, headers=headers),
+blocks[8] = FramedBlock(BareBlock(text=tabulate(table, headers=headers),
                                   hjust='^',
                                   vjust='=',
                                   h_sizepref=SizePref(hard_min='text', hard_max='text')),
@@ -86,25 +88,28 @@ blocks[8] = FramedBlock(BareBlock(tabulate(table, headers=headers),
 eblocks = {}
 
 triangle = '*\n***\n*****\n*******\n*********'
-block_just_block = BareBlock(triangle, block_just=True)
-line_just_block = BareBlock(triangle, block_just=False)
+block_just_block = BareBlock(text=triangle, block_just=True)
+line_just_block = BareBlock(text=triangle, block_just=False)
 eblocks[1] = FramedBlock(block_just_block, title='block_just=True', title_sep='-')
 eblocks[2] = FramedBlock(line_just_block, title='block_just=False', title_sep='-')
 
 eg = Grid(layout=[(1,2)], blocks=eblocks)
-bb = BareBlock(None, grid=eg, h_sizepref=DEFAULT_SIZE_PREF)
+bb = BareBlock(text=None, grid=eg, h_sizepref=DEFAULT_SIZE_PREF)
 blocks[9] = bb  # stick it in slot 9
 
 blocks[10] = BareBlock(text='top output', hjust='^', vjust='^',
                        h_sizepref = SizePref(hard_min=7, hard_max=10))
 
-g = Grid(layout=layout, blocks=blocks)
-ba = BareBlock(None, grid=g)
 
+input_block = InputBlock(name='input')
+blocks[12] = input_block
+g = Grid(layout=layout, blocks=blocks)
+
+ba = BareBlock(grid=g)
 
 # Main logic
 stop_event = Event()
-r = Runner(ba, stop_event=stop_event)
+r = Runner(ba, stop_event=stop_event, cmds={'x', 'abc'})
 r.start()
 
 blocks[1].text = ("{t.normal}A bare block with just a rg&b horizontal line\n" +
@@ -118,10 +123,10 @@ top_thread.start()
 import random
 # Refresh some of the blocks in a tight loop
 for i in range(300):
-    stop_event.wait(0.1)
+    stop_event.wait(.1)
     blocks[2].top_border = str(i%10)
     if not i % 10:
-        blocks[2].bottom_border = random.choice(['{t.red}', '{t.while}', '{t.blue}']) + random.choice(['+', '=', '=', '%'])
+        blocks[2].bottom_border = random.choice(['{t.red}', '{t.white}', '{t.blue}']) + random.choice(['+', '=', '=', '%'])
 
     just = random.choice(['<', '^', '>'])
     block_just_block.hjust = just
@@ -134,7 +139,7 @@ r.load(g2)
 
 # Loop again changing just the block with the time
 for i in range(100):
-    stop_event.wait(.1)
+    stop_event.wait(1)
     blocks[4].text = 'bare_block ' + str(datetime.datetime.now())
 
 stop_event.set()
