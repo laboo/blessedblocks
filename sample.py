@@ -103,7 +103,11 @@ blocks[10] = BareBlock(text='top output', hjust='^', vjust='^',
 
 input_block = InputBlock(name='input')
 blocks[12] = input_block
-g = Grid(layout=layout, blocks=blocks,cmds={'x', 'abc'})
+
+def handler(cmd):
+    pass
+
+g = Grid(layout=layout, blocks=blocks,cmds={'x', 'abc'}, handler=handler)
 
 # Main logic
 stop_event = Event()

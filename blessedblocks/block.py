@@ -34,7 +34,7 @@ SizePref = namedtuple('SizePref', 'hard_min hard_max')
 # other blocks over me if they are requesting it (hard_min=0, ie, no minimum).
 DEFAULT_SIZE_PREF = SizePref(hard_min=0, hard_max=float('inf'))
 class Grid(object):
-    def __init__(self, layout=None, blocks=None, cmds=None):
+    def __init__(self, layout=None, blocks=None, cmds=None, handler=None):
         if (layout or blocks) and not (layout and blocks):
             raise ValueError('Grid arguments must both exist or both not exist.')
         self.write_lock = RLock()
@@ -43,6 +43,7 @@ class Grid(object):
         self._layout = layout if layout else []
         self._index = 0
         self._cmds = cmds
+        self.handler = handler
         self._load(self._layout, blocks)
 
     def _load(self, layout, blocks=None):

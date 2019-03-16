@@ -269,7 +269,8 @@ class Runner(object):
             cmd = self.rebuild_plot_q.get()
             if cmd:
                 # Pass the cmd to the grid
-                raise ValueError(cmd)
+                self._grid.handler(cmd)
+
         subplots = []
         if not layout:
             for _, block in blocks.items():
