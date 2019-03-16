@@ -75,18 +75,17 @@ class Plot(object):
 
 class Runner(object):
 
-    def __init__(self, block, stop_event=None, cmds=None):
+    def __init__(self, grid, stop_event=None):
 
-        self._block = block
+        self._grid = grid
         self._plot = Plot()
         self._done = Event()
         self._term = Terminal()
         self._lock = RLock()
         self._stop_event = stop_event
-        self._cmds = cmds
         self._root_plot = None
         self.rebuild_plot_q = Queue()
-        self.load(self._block.grid)
+        self.load(self._grid)
 
     def __repr__(self):
         return 'runner'
@@ -117,13 +116,13 @@ class Runner(object):
             args=()
         )
 
-        if self._cmds:
+        if self._grid._cmds:
             self._io_thread = Thread(name='io', target=self._read_cmd, args=())
 
         signal.signal(signal.SIGWINCH, self._on_resize)
         signal.signal(signal.SIGINT, self._on_kill)
 
-        if self._cmds:
+        if self._grid._cmds:
             self._io_thread.start()
         self._thread.start()
 
@@ -146,9 +145,9 @@ class Runner(object):
     def _read_cmd(self):
         PROMPT = ''
         with self._term.cbreak():
-            if 'input' not in self._block.grid._names:
+            if 'input' not in self._grid._names:
                 return
-            input_block = self._block.grid._names['input']
+            input_block = self._grid._names['input']
             input_block.text = PROMPT
             while True:
                 val = self._term.inkey(timeout=.5)
@@ -159,7 +158,7 @@ class Runner(object):
                 elif val.is_sequence:
                     if val.name == 'KEY_ENTER':
                         # if not cmd: ??? maybe refresh something? or redo previous?
-                        if input_block.text in self._cmds:
+                        if input_block.text in self._grid._cmds:
                             self.rebuild_plot_q.put(input_block.text)
                         else:
                             pass  # TODO command not recognized
@@ -177,8 +176,8 @@ class Runner(object):
                             input_block.text = PROMPT
                         if ord(val) == 32: # space
                             input_block.text += Block.MIDDLE_DOT
-                    elif not input_block.text and val in self._cmds:  # Handles one-char-no-return commands
-                        #print('got single cmd', self._block.text)  # TODO place on cmd q
+                    elif not input_block.text and val in self._grid._cmds:
+                        # Handles one-char-no-return commands
                         self.rebuild_plot_q.put(val)
                     else:
                         input_block.text += val
@@ -193,7 +192,7 @@ class Runner(object):
                             break
 
                         with self._lock:
-                            self.load(self._block.grid)
+                            self.load(self._grid)
                             self.display_plot(self._root_plot,
                                               0, 0,                                 # x, y
                                               self._term.width, self._term.height,  # w, h
@@ -212,17 +211,17 @@ class Runner(object):
 
     def update_block(self, index, block):
         with self._lock:
-            self._block.grid._slots[index] = block
+            self._grid._slots[index] = block
             block.dirty_event_q = self.rebuild_plot_q
         self.update()
 
     def load(self, grid):
         with self._lock:
-            self._block.grid = grid
-            for _, block in self._block.grid._slots.items():
+            self._grid = grid
+            for _, block in self._grid._slots.items():
                 block.dirty_event_q = self.rebuild_plot_q
-            layout = self._block.grid._layout
-            blocks = self._block.grid._slots
+            layout = self._grid._layout
+            blocks = self._grid._slots
             self._root_plot = self.build_plot(layout, blocks)
 
 
@@ -269,6 +268,7 @@ class Runner(object):
         while not self.rebuild_plot_q.empty():
             cmd = self.rebuild_plot_q.get()
             if cmd:
+                # Pass the cmd to the grid
                 raise ValueError(cmd)
         subplots = []
         if not layout:

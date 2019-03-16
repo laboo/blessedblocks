@@ -103,13 +103,12 @@ blocks[10] = BareBlock(text='top output', hjust='^', vjust='^',
 
 input_block = InputBlock(name='input')
 blocks[12] = input_block
-g = Grid(layout=layout, blocks=blocks)
-
-ba = BareBlock(grid=g)
+g = Grid(layout=layout, blocks=blocks,cmds={'x', 'abc'})
 
 # Main logic
 stop_event = Event()
-r = Runner(ba, stop_event=stop_event, cmds={'x', 'abc'})
+r = Runner(g, stop_event=stop_event)
+
 r.start()
 
 blocks[1].text = ("{t.normal}A bare block with just a rg&b horizontal line\n" +
