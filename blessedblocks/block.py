@@ -137,8 +137,8 @@ class Block(object, metaclass=abc.ABCMeta):
                  w_sizepref = None,
                  h_sizepref = None,
                  grid=None):
-        self.name = name
         self.write_lock = RLock()
+        self.name = name
         self.hjust = hjust
         self.vjust = vjust
         self.block_just = block_just
@@ -155,7 +155,7 @@ class Block(object, metaclass=abc.ABCMeta):
 
 
     def __repr__(self):
-        return ('<Block {{name={0}}}>'
+        return ('<Block name={0}>'
                 .format(self.name))
 
     @abc.abstractmethod
@@ -265,4 +265,12 @@ class Block(object, metaclass=abc.ABCMeta):
     @num_text_cols.setter
     @safe_set
     def num_text_cols(self, val): self._num_text_cols = val
+
+    @property
+    @safe_get
+    def name(self): return self._name
+
+    @name.setter
+    @safe_set
+    def name(self, val): self._name = val
 

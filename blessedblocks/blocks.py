@@ -12,21 +12,26 @@ class InputBlock(Block):
                          grid=grid)
         # TODO when wrapping is supported, wrap this text
         self.w_sizepref = SizePref(hard_min='text', hard_max=float('inf'))
-        self.h_sizepref = SizePref(hard_min=2, hard_max=2)  # both == 'text' if wrapping
+        self.h_sizepref = SizePref(hard_min=1, hard_max=1)  # both == 'text' if wrapping
         self.default_status = default_status
         self.status = self.default_status
 
     def display(self, width, height, x, y, term=None):
+        prompt = '> '
         with self.write_lock:
             if term:
                 with term.location(x=x, y=y):
-                    line = '> ' + self.text
-                    print(line[:width] + (' ' * (width-len(line))), end='')
-                with term.location(x=x, y=y+1):
-                    line = Line('{t.red}' + self.status, width, '<')
-                    print(line.display.format(t=term), end='')
+                    if self.status:
+                        line = Line(prompt + '{t.red}' + self.status, width, '<')
+                        print(line.display.format(t=term), end='')
+                    elif self.text:
+                        line = prompt + self.text
+                        print(line[:width] + (' ' * (width-len(line))), end='')
+                    else:
+                        line = Line(prompt + '{t.red}' + self.default_status, width, '<')
+                        print(line.display.format(t=term), end='')
             else:
-                return [self.text]  # for testing purposes only
+                return [line]  # for testing purposes only
 
 class VFillBlock(Block):
     def __init__(self, text, name=None):
@@ -218,13 +223,22 @@ class FramedBlock(Block):
         self._blocks[7] = VFillBlock(right_border)
 
         super().__init__(name=name,
-                         text=None,
+                         text=' ',  # TODO
                          hjust='^',
                          vjust='^',
                          block_just=True,
                          grid = Grid(FramedBlock.layout, self._blocks))
 
         self.no_borders = no_borders
+
+    @property
+    @safe_get
+    def text(self): return self._blocks[5].text
+
+    @text.setter
+    @safe_set
+    def text(self, val):
+        self._blocks[5].text = val
 
     @property
     @safe_get
