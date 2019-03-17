@@ -327,15 +327,23 @@ class Runner(object):
             if type(element) == int:
                 block = blocks[element]
                 if block.grid:
+                    if block.w_sizepref or block.h_sizepref:
+
+                        temp = self.build_plot(None, {element: block})
                     subplot = self.build_plot(block.grid._layout,
                                               block.grid._slots)
+                    if block.w_sizepref:
+                        subplot.w_sizepref = temp.w_sizepref
+                    if block.h_sizepref:
+                        subplot.h_sizepref = temp.h_sizepref
+
                 else:  # it's a leaf block
                     subplot = self.build_plot(None, {element: block})
+
             else:  # it's list or tuple
                orientation = type(element) == list
                subplot = self.build_plot(element, blocks, orientation)
             subplots.append(subplot)
-
         w_sizepref, h_sizepref = merge_sizeprefs(subplots, horizontal)
         return Plot(w_sizepref, h_sizepref, horizontal=horizontal, subplots=subplots)
 
