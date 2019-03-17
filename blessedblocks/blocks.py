@@ -4,16 +4,16 @@ from threading import Thread
 import re
 
 class InputBlock(Block):
-    def __init__(self, name=None, grid=None):
+    def __init__(self, name='input', grid=None, default_status=''):
         super().__init__(name,
                          text='> ',
                          hjust='<',
                          vjust='^',
                          grid=grid)
         # TODO when wrapping is supported, wrap this text
-        self.w_sizepref = SizePref(hard_min=0, hard_max=float('inf'))
+        self.w_sizepref = SizePref(hard_min='text', hard_max=float('inf'))
         self.h_sizepref = SizePref(hard_min=2, hard_max=2)  # both == 'text' if wrapping
-        self.default_status = 'Type h for help'
+        self.default_status = default_status
         self.status = self.default_status
 
     def display(self, width, height, x, y, term=None):
@@ -21,9 +21,10 @@ class InputBlock(Block):
             if term:
                 with term.location(x=x, y=y):
                     line = '> ' + self.text
-                    print(line + (' ' * (width-len(line))), end='')
+                    print(line[:width] + (' ' * (width-len(line))), end='')
                 with term.location(x=x, y=y+1):
-                    print(("{t.red}" + self.status).format(t=term), end='')
+                    line = Line('{t.red}' + self.status, width, '<')
+                    print(line.display.format(t=term), end='')
             else:
                 return [self.text]  # for testing purposes only
 

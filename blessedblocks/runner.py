@@ -4,7 +4,7 @@ from .block import Block, Grid, SizePref, DEFAULT_SIZE_PREF
 from .debug import debug_q
 from math import floor, ceil
 from threading import Event, Thread, RLock, current_thread
-from queue import Queue
+from queue import Queue, Empty
 from time import sleep
 import signal
 import logging
@@ -97,9 +97,13 @@ class Runner(object):
         return self._term.height
 
     def _on_kill(self, *args):
-        if self._stop_event:
-            self._stop_event.set()
-        self.stop()
+        if self._grid._cmds:
+            self._grid._names['input'].status = 'KeyboardInterrupt (Control-D to exit)'
+            self._grid._names['input'].text = ''
+        else:
+            if self._stop_event:
+                self._stop_event.set()
+            self.stop()
 
     def update_all(self):
         if self.rebuild_plot_q.empty():
@@ -151,17 +155,19 @@ class Runner(object):
             input_block.text = PROMPT
             while True:
                 val = self._term.inkey(timeout=.5)
-
                 if not val:  # timeout
                     if self._done.is_set():
                         break
-                elif val.is_sequence:
+                    continue
+                else:
+                    input_block.status = input_block.default_status
+                if val.is_sequence:
                     if val.name == 'KEY_ENTER':
                         # if not cmd: ??? maybe refresh something? or redo previous?
                         if input_block.text in self._grid._cmds:
                             self.rebuild_plot_q.put(input_block.text)
-                        else:
-                            pass  # TODO command not recognized
+                        elif input_block.text:
+                            input_block.status = 'Unknown command: {}'.format(input_block.text)
                         input_block.text = PROMPT
                     elif val.name == 'KEY_DELETE':
                         input_block.text = input_block.text[:-1]
@@ -173,7 +179,9 @@ class Runner(object):
                 else:
                     if not val.isalnum():
                         if ord(val) == 4:  # ctl-d
-                            input_block.text = PROMPT
+                            if self._stop_event:
+                                self._stop_event.set()
+                            self.stop()
                         if ord(val) == 32: # space
                             input_block.text += Block.MIDDLE_DOT
                     elif not input_block.text and val in self._grid._cmds:
@@ -190,6 +198,12 @@ class Runner(object):
                     while True:
                         if self._done.is_set():
                             break
+                        try:
+                            cmd = self.rebuild_plot_q.get(timeout=.5)
+                            if cmd:  # requeue it, we don't process it here
+                                self.rebuild_plot_q.put(cmd)
+                        except Empty:
+                            pass
 
                         with self._lock:
                             self.load(self._grid)
