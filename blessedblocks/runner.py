@@ -179,6 +179,7 @@ class Runner(object):
                 else:
                     if not val.isalnum():
                         if ord(val) == 4:  # ctl-d
+                            input_block.status = 'Exiting'
                             if self._stop_event:
                                 self._stop_event.set()
                             self.stop()
