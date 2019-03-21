@@ -198,6 +198,7 @@ class FramedBlock(Block):
     def __init__(self,
                  block,
                  name=None,
+                 text=' ',  # TODO
                  no_borders=False,
                  top_border=Block.MIDDLE_DOT,
                  bottom_border=Block.MIDDLE_DOT,
@@ -223,7 +224,7 @@ class FramedBlock(Block):
         self._blocks[7] = VFillBlock(right_border)
 
         super().__init__(name=name,
-                         text=' ',  # TODO
+                         text=text,
                          hjust='^',
                          vjust='^',
                          block_just=True,

@@ -43,12 +43,13 @@ blocks = {}
 
 blocks[1] = BareBlock(h_sizepref=SizePref(hard_min=1, hard_max=1))
 
-blocks[2] = FramedBlock(BareBlock(text=FILLER, hjust='>'), # with a title, right justified
+blocks[2] = FramedBlock(BareBlock(hjust='>'), # with a title, right justified
+                        text=FILLER,
                         title='{t.cyan}Block {t.red}#2{t.normal}',
                         title_sep='-',
                         top_border='x')
-
-blocks[3] = FramedBlock(BareBlock(text=FILLER, vjust='v'),
+blocks[3] = FramedBlock(BareBlock(vjust='v'),
+                        text=FILLER,
                         no_borders=True,
                         title='FramedBlock with no borders',
                         title_sep='-')
@@ -56,26 +57,24 @@ blocks[3] = FramedBlock(BareBlock(text=FILLER, vjust='v'),
 blocks[4] = BareBlock(name='dt', text=str(datetime.datetime.now()), hjust='^', vjust='=',
                       h_sizepref = SizePref(hard_min=1, hard_max=1))
 
-blocks[5] = FramedBlock(BareBlock(text=FILLER,
-                                  h_sizepref = SizePref(hard_min=0, hard_max='text')),
+blocks[5] = FramedBlock(BareBlock(h_sizepref = SizePref(hard_min=0, hard_max='text')),
+                        text=FILLER,
                         title='Block #5',
                         title_sep='-')
 
-blocks[6] = FramedBlock(BareBlock(text=tabulate([['col1', 'col2'], [1.23, 2.456]]), # text at bottom of block
-                                  hjust='^'),
+blocks[6] = FramedBlock(BareBlock(hjust='^'),
+                        text=tabulate([['col1', 'col2'], [1.23, 2.456]]), # text at bottom of block
                         title="tabulate block hjust=^",
                         title_sep='-')
 
-blocks[7] = FramedBlock(BareBlock(text=FILLER),title='Block #7',title_sep='-')
+blocks[7] = FramedBlock(BareBlock(), text=FILLER, title='Block #7',title_sep='-')
 
 headers=["Planet","R (km)", "mass (x 10^29 kg)"]
 table = [["Sun",696000,1989100000],["Earth",6371,5973.6],
          ["Moon",1737,73.5],["Mars",3390,641.85]]
 
-blocks[8] = FramedBlock(BareBlock(text=tabulate(table, headers=headers),
-                                  hjust='^',
-                                  vjust='=',
-                                  h_sizepref=SizePref(hard_min='text', hard_max='text')),
+blocks[8] = FramedBlock(BareBlock(hjust='^', vjust='=', h_sizepref=SizePref(hard_min='text', hard_max='text')),
+                        text=tabulate(table, headers=headers),
                         left_border='{t.blue}#',
                         right_border='{t.green}#',
                         top_border='{t.magenta}# ',
@@ -88,10 +87,10 @@ blocks[8] = FramedBlock(BareBlock(text=tabulate(table, headers=headers),
 eblocks = {}
 
 triangle = '*\n***\n*****\n*******\n*********'
-block_just_block = BareBlock(text=triangle, block_just=True)
-line_just_block = BareBlock(text=triangle, block_just=False)
-eblocks[1] = FramedBlock(block_just_block, title='block_just=True', title_sep='-')
-eblocks[2] = FramedBlock(line_just_block, title='block_just=False', title_sep='-')
+block_just_block = BareBlock(block_just=True)
+line_just_block = BareBlock(block_just=False)
+eblocks[1] = FramedBlock(block_just_block, text=triangle, title='block_just=True', title_sep='-')
+eblocks[2] = FramedBlock(line_just_block, text=triangle, title='block_just=False', title_sep='-')
 
 eg = Grid(layout=[(1,2)], blocks=eblocks)
 bb = BareBlock(text=None, grid=eg, h_sizepref=DEFAULT_SIZE_PREF)
