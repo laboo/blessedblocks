@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 setup(
     name='blessedblocks',
     packages=find_packages(),
-    version='0.0.8',
+    version='0.0.9',
     description='Display a terminal window in blocks using the blessed module.',
     author='Mark Libucha',
     author_email='mlibucha@gmail.com',
@@ -26,7 +26,7 @@ setup(
         'Programming Language :: Python :: Implementation :: CPython'
     ],
     install_requires=[
-        "blessed>=1.14.2, <2.0.0",
+        "blessed>=1.15.0, <2.0.0",
         "six>=1.11.0, <2.0.0",
         "tabulate>=0.8.2, <2.0.0",
         "wcwidth>=0.1.7, <2.0.0",
